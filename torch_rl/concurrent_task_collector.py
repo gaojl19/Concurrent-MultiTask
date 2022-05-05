@@ -13,7 +13,7 @@ from metaworld_utils.meta_env import generate_single_mt_env
 
 
 class ConcurrentCollector():
-    def __init__(self, env, env_cls, env_args, env_info, device, max_path_length, min_timesteps_per_batch, input_shape, embedding_input = [], index_input = None):
+    def __init__(self, env, env_cls, env_args, env_info, device, max_path_length, min_timesteps_per_batch, input_shape, task_types, embedding_input = [], index_input = None):
         self.env = copy.deepcopy(env)
         self.env_cls = copy.deepcopy(env_cls)
         self.env_args = copy.deepcopy(env_args)
@@ -24,7 +24,7 @@ class ConcurrentCollector():
         self.embedding_input = embedding_input
         self.index_input = index_input
         self.input_shape = input_shape
-        
+        self.task_types = task_types
         
         self.env_info.env_cls = generate_single_mt_env
         tasks = list(self.env_cls.keys())
@@ -56,7 +56,7 @@ class ConcurrentCollector():
     
     
     # the policy gradient should be frozen before sending into this function
-    def sample_expert(self, action_file, render=True, log=True, tag=None):  
+    def sample_expert(self, action_file, render=True, log=True, plot_prefix=None, tag=None):  
         
         render=True
         log_info = ""
@@ -64,7 +64,10 @@ class ConcurrentCollector():
         # initialize env for the beginning of a new rollout
         env = self.env_info.env
         env.eval()
-        ob = env.reset()
+        if self.task_types == ["push-2"]:
+            ob = env.reset(push_2_init=True)
+        else:
+            ob = env.reset()
         log_info += "initial obs: "+ str(ob) + "\n"
         # TODO: separate obs for different tasks
         # ob = np.concatenate((ob[:6], ob[9:12]))
@@ -158,9 +161,9 @@ class ConcurrentCollector():
         
         if render:    
             if len(image_obs_front)>0:
-                imageio.mimsave("../Expert/Concurrent/" + tag + "_front.gif", image_obs_front)
+                imageio.mimsave(plot_prefix + tag + "_expert_front.gif", image_obs_front)
             if len(image_obs_left)>0:
-                imageio.mimsave("../Expert/Concurrent/" + tag + "_left.gif", image_obs_left)
+                imageio.mimsave(plot_prefix + tag + "_expert_left.gif", image_obs_left)
         
         if log == True:
             print(log_info)
@@ -178,81 +181,90 @@ class ConcurrentCollector():
     def run_agent(self, policy, render=False, log = False, log_prefix = "./", n_iter=0, use_embedding=False):
         
         # initialize env for the beginning of a new rollout
-        env = self.env_info.env
-        env.eval()
-        ob = env.reset()
-        log_info = "initial ob: " + str(ob) + "\n"
-        
-        # init vars
-        obs, acs, rewards, next_obs, terminals, image_obs_front, image_obs_left, embedding_input, index_input = [], [], [], [], [], [], [], [], []
-        steps = 0
-        done = False
         success_push_1 = 0
         success_push_2 = 0
-        push_dist1 = 0
-        push_dist2 = 0
+        push_dist1 = 1
+        push_dist2 = 1
         
-        while True:
-            embedding_input.append(self.embedding_input)
-            index_input.append(self.index_input)
-            
-            # use the most recent ob to decide what to do
-            if use_embedding:
-                ob = ob[:policy.input_shape-self.embedding_input.shape[1]]
-                obs.append(ob)
-                ob = torch.Tensor(np.concatenate((ob, self.embedding_input.squeeze())))
+        # test push-1 and push-2 sequentially
+        for task in self.task_types:
+            env = self.env_info.env
+            env.eval()
+            if task == "push-2":
+                ob = env.reset(push_2_init=True)
             else:
-                ob = ob[:policy.input_shape]
-                obs.append(ob)
+                ob = env.reset()
                 
-            act = policy.get_action(torch.Tensor(ob).to(self.device).unsqueeze(0)).detach().cpu().numpy()
-            act = np.squeeze(act)
-            # log_info += "agent:" + str(act) + "\n"
+            log_info = "initial ob: " + str(ob) + "\n"
+            
+            # init vars
+            obs, acs, rewards, next_obs, terminals, image_obs_front, image_obs_left, embedding_input, index_input = [], [], [], [], [], [], [], [], []
+            steps = 0
+            done = False
+            
+            while True:
+                embedding_input.append(self.embedding_input)
+                index_input.append(self.index_input)
                 
-            acs.append(act)
-            
-            # take that action and record results
-            ob, r, done, info = env.step(act)
-            if use_embedding:
-                ob = ob[:policy.input_shape-self.embedding_input.shape[1]]
-            else:
-                ob = ob[:policy.input_shape]
-            
-            # record result of taking that action
-            steps += 1
-            next_obs.append(ob)
-            rewards.append(r)
-            
-            # only support rbg_array mode currently
-            if render:
-                image = env.get_image(400,400,'leftview')
-                image_obs_left.append(image)
-                image = env.get_image(400,400,'frontview')
-                image_obs_front.append(image)
-            
-            success_push_1 = max(success_push_1, info["success_push_1"])
-            success_push_2 = max(success_push_2, info["success_push_2"])
-            push_dist1 = min(push_dist1, info["pushDist1"])
-            push_dist2 = min(push_dist2, info["pushDist2"])
+                # use the most recent ob to decide what to do
+                if use_embedding:
+                    ob = ob[:policy.input_shape-self.embedding_input.shape[1]]
+                    obs.append(ob)
+                    ob = torch.Tensor(np.concatenate((ob, self.embedding_input.squeeze())))
+                else:
+                    ob = ob[:policy.input_shape]
+                    obs.append(ob)
+                    
+                act = policy.get_action(torch.Tensor(ob).to(self.device).unsqueeze(0)).detach().cpu().numpy()
+                act = np.squeeze(act)
+                # log_info += "agent:" + str(act) + "\n"
+                    
+                acs.append(act)
+                
+                # take that action and record results
+                ob, r, done, info = env.step(act)
+                if use_embedding:
+                    ob = ob[:policy.input_shape-self.embedding_input.shape[1]]
+                else:
+                    ob = ob[:policy.input_shape]
+                
+                # record result of taking that action
+                steps += 1
+                next_obs.append(ob)
+                rewards.append(r)
+                
+                # only support rbg_array mode currently
+                if render:
+                    image = env.get_image(400,400,'leftview')
+                    image_obs_left.append(image)
+                    image = env.get_image(400,400,'frontview')
+                    image_obs_front.append(image)
+                
+                success_push_1 = max(success_push_1, info["success_push_1"])
+                success_push_2 = max(success_push_2, info["success_push_2"])
+                push_dist1 = min(push_dist1, info["pushDist1"])
+                push_dist2 = min(push_dist2, info["pushDist2"])
 
-            # end the rollout if the rollout ended
-            rollout_done = True if (done or steps>=self.max_path_length) else False
-            terminals.append(rollout_done)
+                # end the rollout if the rollout ended
+                rollout_done = True if (done or steps>=self.max_path_length) else False
+                terminals.append(rollout_done)
 
-            if rollout_done:
-                break
+                if rollout_done:
+                    break
+            
+                
+            if len(image_obs_front)>0:
+                imageio.mimsave(log_prefix + str(n_iter) + "_" + task + "_agent_front.gif", image_obs_front)
+            if len(image_obs_left)>0:
+                imageio.mimsave(log_prefix + str(n_iter) + "_" + task +"_agent_left.gif", image_obs_left)
+        
         
         log_info += "agent_success_push_1: " + str(success_push_1) + "\n"
         log_info += "agent_success_push_2: " + str(success_push_2) + "\n"
         log_info += "agent_push_1: " +  str(push_dist1) + "\n"
         log_info += "agent_push_2: " + str(push_dist2) + "\n"
-        log_info += "path_length: " + str(len(acs)) + "\n"
-            
-        if len(image_obs_front)>0:
-            imageio.mimsave(log_prefix + str(n_iter) + "_agent_front.gif", image_obs_front)
-        if len(image_obs_left)>0:
-            imageio.mimsave(log_prefix + str(n_iter) + "_agent_left.gif", image_obs_left)
-            
+        log_info += "path_length: " + str(len(acs)) + "\n"     
+        
         if log == True:
             print(log_info)
         

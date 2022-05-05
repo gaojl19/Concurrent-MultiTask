@@ -33,7 +33,7 @@ class BC_Trainer(object):
         # BUILD ENV
         self.device = torch.device("cuda:{}".format(args["device"]) if args["cuda"] else "cpu")
         cls_dicts = {"push": ConcurrentSawyerEnv}
-        cls_args = {"push": dict(args=[], kwargs={'obs_type': params['meta_env']['obs_type'], 'tasks': [args["task_type"]]})}
+        cls_args = {"push": dict(args=[], kwargs={'obs_type': params['meta_env']['obs_type'], 'task_types': [args["task_types"]]})}
         env_name =  ConcurrentSawyerEnv
         self.env = get_meta_env(env_name, params['env'], params['meta_env'], return_dicts=False) 
 
@@ -83,7 +83,7 @@ class BC_Trainer(object):
 
         
         # LOG PREFIX
-        log_prefix = "./fig/separate_baseline/" + args["task_type"] + "/"
+        log_prefix = "./fig/separate_baseline/" + args["task_types"] + "/"
     
         # RL TRAINER
         self.rl_trainer = RL_Trainer(env = self.env, 
@@ -94,6 +94,7 @@ class BC_Trainer(object):
                                      input_shape = ob_dim,
                                      expert_num = args["expert_num"],
                                      plot_prefix=log_prefix,
+                                     task_types=[args["task_types"]],
                                      mt_flag=False) 
         
     
@@ -116,7 +117,7 @@ def main():
     parser = argparse.ArgumentParser()
     
     # customized parameters
-    parser.add_argument("--task_type", type=str, default=None,help="task name for single task training: push_1_2, push_1, push_2",)
+    parser.add_argument("--task_types", type=str, default=None,help="task name for single task training: push-1, push-2",)
     parser.add_argument("--task_env", type=str, default=None, help="task to env mapping for single task training: MT10_task_env / MT50_task_env",)
     parser.add_argument("--expert_num", type=int, default=None, help="expert file prefix index", )
     

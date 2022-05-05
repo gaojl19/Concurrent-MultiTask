@@ -18,7 +18,6 @@ class ConcurrentSawyerEnv(SawyerXYZEnv):
             self,
             random_init=False,
             task_types=["push-1", "push-2"],
-            tasks=['push-1', 'push-2'],
             obs_type='plain',
             goal_low=(-0.1, 0.6, 0.05),
             goal_high=(0.2, 0.9, 0.3),
@@ -53,7 +52,6 @@ class ConcurrentSawyerEnv(SawyerXYZEnv):
             model_name=self.model_name,
             **kwargs
         )
-        self.tasks = tasks
         self.hand_init_pos = np.array([0, .6, .2])
         
         # push-1
@@ -287,8 +285,15 @@ class ConcurrentSawyerEnv(SawyerXYZEnv):
 
         #The convention we follow is that body_com[2] is always 0, and geom_pos[2] is the object height
         return [adjustedPos[0], adjustedPos[1],self.data.get_geom_xpos(obj_geom_name)[-1]]
+    
+    def reset(self, push_2_init=False):
+        self.sim.reset()
+        ob = self.reset_model(push_2_init)
+        if self.viewer is not None:
+            self.viewer_setup()
+        return ob
 
-    def reset_model(self):
+    def reset_model(self, push_2_init=False):
         self._reset_hand()
         self._state_goal = self.goal.copy()
         self.obj_init_pos1 = self.adjust_initObjPos(self.init_config1['obj_init_pos'], 'obj1', 'objGeom1')
@@ -344,6 +349,10 @@ class ConcurrentSawyerEnv(SawyerXYZEnv):
         #     idx = 0
         # self.target_reward = self.target_rewards[idx]
         # self.move_to_fixedpoint()
+        
+        if push_2_init:
+            print("push_2 init!")
+            self.move_to_fixedpoint()
         self.num_resets += 1
         
         return self._get_obs()
@@ -653,6 +662,31 @@ class ConcurrentSawyerEnv(SawyerXYZEnv):
         # demo_json = json.dumps(demonstration, sort_keys=False, indent=4)
         # f = open("./log/simulator_fixed_point_traj.json", 'w')
         # f.write(demo_json)
+    
+    def move_to_fixedpoint_2(self):
+        import json
+        with open("./metaworld_utils/reach_to_fixed_point_traj_2.json", 'r') as fin:
+            acs = json.load(fin)["actions"]
+        fin.close()
+        obs = []
+        
+        for action in acs:
+            obs.append(self._get_obs())
+            action = np.array(action)
+            if self.rotMode == 'euler':
+                action_ = np.zeros(7)
+                action_[:3] = action[:3]
+                action_[3:] = euler2quat(action[3:6])
+                self.set_xyz_action_rot(action_)
+            elif self.rotMode == 'fixed':
+                self.set_xyz_action(action[:3])
+            elif self.rotMode == 'rotz':
+                self.set_xyz_action_rotz(action[:4])
+            else:
+                self.set_xyz_action_rot(action[:7])
+            self.do_simulation([action[-1], -action[-1]])
+            # The marker seems to get reset every time you do a simulation
+            self._set_goal_marker(self._state_goal)
 
     def log_diagnostics(self, paths = None, logger = None):
         pass

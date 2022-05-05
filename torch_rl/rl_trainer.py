@@ -21,7 +21,7 @@ MAX_VIDEO_LEN = 40  # we overwrite this in the code below
 
 
 class RL_Trainer(object):
-    def __init__(self, env, env_cls, env_args, args, params, agent, expert_num, input_shape, plot_prefix=None, mt_flag=False):
+    def __init__(self, env, env_cls, env_args, args, params, agent, expert_num, input_shape, task_types, plot_prefix=None, mt_flag=False):
         
         # environment
         self.env = env
@@ -61,7 +61,8 @@ class RL_Trainer(object):
             device=params['general_setting']['device'],
             max_path_length=self.args["ep_len"],
             min_timesteps_per_batch=self.args['batch_size'],
-            input_shape = input_shape
+            input_shape = input_shape,
+            task_types=task_types
         )
     
     
@@ -70,28 +71,28 @@ class RL_Trainer(object):
         
         for i in range(self.expert_num):
             TAG = str(i+1)
-            if self.args["task_type"] == "push_1":   # concurrent learning both push-1 and push-2
-                expert_file_path = ["../Expert/Concurrent/" + TAG + "/push_1.json", "../Expert/Concurrent/" + TAG + "/push_3.json"]
-            elif self.args["task_type"] == "push_2":
-                expert_file_path = ["../Expert/Concurrent/" + TAG + "/push_2.json"]
+            if self.mt_flag == False:
+                if self.args["task_types"] == "push-1":   # concurrent learning both push-1 and push-2
+                    expert_file_path = ["../Expert/Concurrent/" + TAG + "/push_1.json", "../Expert/Concurrent/" + TAG + "/push_3.json"]
+                elif self.args["task_types"] == "push-2":
+                    expert_file_path = ["../Expert/Concurrent/" + TAG + "/push_2.json"]
+                else:
+                    raise NotImplementedError("Invalid task_type!" + self.args["task_types"])
             else:
-                raise NotImplementedError("Invalid task_type!" + self.args["task_type"])
+                expert_file_path = ["../Expert/Concurrent/" + TAG + "/push_1.json", "../Expert/Concurrent/"+ TAG + "/1.json", "../Expert/Concurrent/" + TAG + "/push_2.json", "../Expert/Concurrent/"+ TAG + "/2.json", "../Expert/Concurrent/" + TAG + "/push_3.json"]
             
-            training_returns = self.expert_env.sample_expert(action_file=expert_file_path, render=False, log=True, tag = TAG)
+            training_returns = self.expert_env.sample_expert(action_file=expert_file_path, render=True, log=True, plot_prefix = self.plot_prefix, tag = TAG)
         
             paths, envsteps_this_batch= training_returns
             self.total_envsteps += envsteps_this_batch
             
             # add collected data to replay buffer
-            if self.mt_flag: 
-                self.agent.add_mt_to_replay_buffer(paths)
-            else:
-                self.agent.add_to_replay_buffer(paths)
+            self.agent.add_to_replay_buffer(paths)
                 
         print("total training samples: ", self.total_envsteps)
 
 
-    def run_training_loop(self, n_iter, expert_task_curve={}, agent_task_curve={}, stdscr=None):
+    def run_training_loop(self, n_iter, stdscr=None):
         """
         :param n_iter:  number of (dagger) iterations
         :param collect_policy:
@@ -106,7 +107,6 @@ class RL_Trainer(object):
         self.total_envsteps = 0
         self.start_time = time.time()
         loss_curve = []
-        expert_success_curve = []
         agent_success_curve = []
     
     
@@ -137,12 +137,10 @@ class RL_Trainer(object):
             if itr % self.args["eval_interval"] == 0:
                 print("\n\n-------------------------------- Evaluating Iteration %i -------------------------------- "%itr)
                 render = self.params["general_setting"]["eval_render"]
-                if self.mt_flag == False:
-                    success_dict = self.expert_env.run_agent(policy=self.agent.actor, render=render, log=True, log_prefix = self.plot_prefix, n_iter=itr)
-                    agent_success_curve.append(success_dict)
-                else:
-                    success_dict = self.expert_env.run_agent(policy=self.agent.actor, render=render, log=True, log_prefix = self.plot_prefix, n_iter=itr)
-
+                
+                success_dict = self.expert_env.run_agent(policy=self.agent.actor, render=render, log=True, log_prefix = self.plot_prefix, n_iter=itr)
+                agent_success_curve.append(success_dict)
+                
                 eval_time = time.time() - eval_start_time
                 print("training time: ", train_time)
                 print("evaluation time: ", eval_time)
@@ -164,9 +162,8 @@ class RL_Trainer(object):
         model_file_name="model.pth"
         model_path=osp.join(self.plot_prefix, model_file_name)
         
-        if self.mt_flag == False:
-            success_dict = self.expert_env.run_agent(policy=self.agent.actor, render=render, log=True, log_prefix = self.plot_prefix, n_iter=itr)
-            torch.save(self.agent.actor.state_dict(), model_path)
+        success_dict = self.expert_env.run_agent(policy=self.agent.actor, render=render, log=True, log_prefix = self.plot_prefix, n_iter=itr)
+        torch.save(self.agent.actor.state_dict(), model_path)
         # else:
         #     success_dict = self.expert_env.run_agent(log_prefix=self.plot_prefix, agent_policy=self.agent.actor.policy, input_shape = self.agent.actor.input_shape, render=render)
         #     torch.save(self.agent.actor.state_dict(), model_path)
@@ -198,16 +195,8 @@ class RL_Trainer(object):
         for _ in range(self.args['gradient_steps']):
 
             # sample some data from the data buffer, and train on that batch
-            if self.mt_flag:
-                if self.index_flag:
-                    ob_batch, ac_batch, index_batch = self.agent.mt_sample(self.args['train_batch_size'])
-                    train_log = self.agent.train(ob_batch, ac_batch, index_batch)
-                else:  
-                    ob_batch, ac_batch, embedding_batch = self.agent.mt_sample(self.args['train_batch_size'])
-                    train_log = self.agent.train(ob_batch, ac_batch, embedding_batch) # alternate=-1, meaning disabled
-            else:
-                ob_batch, ac_batch = self.agent.sample(self.args['train_batch_size'])
-                train_log = self.agent.train(ob_batch, ac_batch)
+            ob_batch, ac_batch = self.agent.sample(self.args['train_batch_size'])
+            train_log = self.agent.train(ob_batch, ac_batch)
                 
             all_logs.append(train_log)
             
