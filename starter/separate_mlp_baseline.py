@@ -70,6 +70,9 @@ class BC_Trainer(object):
         self.args['agent_params']['ob_dim'] = ob_dim
         agent = MLPAgent(self.env, self.args['agent_params'])
 
+        if args["load_from_checkpoint"]:
+            agent.actor.load_state_dict(torch.load(args["load_from_checkpoint"], map_location='cpu'))
+
         
         # EXPERT file path
         # TAG = args["expert_index"]
@@ -111,6 +114,10 @@ class BC_Trainer(object):
                 n_iter=self.args['n_iter']
             )
     
+    def run_test(self):
+        self.rl_trainer.agent.actor.eval()
+        self.rl_trainer.test_agent()
+    
    
 def main():
     import argparse
@@ -120,6 +127,9 @@ def main():
     parser.add_argument("--task_types", type=str, default=None,help="task name for single task training: push-1, push-2",)
     parser.add_argument("--task_env", type=str, default=None, help="task to env mapping for single task training: MT10_task_env / MT50_task_env",)
     parser.add_argument("--expert_num", type=int, default=None, help="expert file prefix index", )
+    parser.add_argument("--test", type=bool, default=False)
+    parser.add_argument("--load_from_checkpoint", type=str, default=None)
+    parser.add_argument("--interface", type=bool, default=False)
     
     # training settings
     parser.add_argument('--ep_len', type=int)
@@ -153,8 +163,6 @@ def main():
     parser.add_argument("--device", type=int, default=0, help="gpu secification", )
     
     parser.add_argument("--multiple_runs", type=bool, default=False, help="run multiple training loops with different sample sizes", )
-    parser.add_argument("--load_from_checkpoint", type=str, default=None)
-    parser.add_argument("--interface", type=bool, default=False)
     
     # tensorboard
     parser.add_argument("--id", type=str, default=None, help="id for tensorboard", )
@@ -171,10 +179,13 @@ def main():
     
     # RUN TRAINING
     trainer = BC_Trainer(args, params)
-    if args["multiple_runs"]:
-        trainer.run_multiple_training_loop()
+    if args["test"]:
+        trainer.run_test()
     else:
-        trainer.run_training_loop()
+        if args["multiple_runs"]:
+            trainer.run_multiple_training_loop()
+        else:
+            trainer.run_training_loop()
 
 if __name__ == "__main__":
     main()

@@ -57,13 +57,13 @@ class ConcurrentSawyerEnv(SawyerXYZEnv):
         # push-1
         self.init_config1 = {
             'obj_init_angle': .3,
-            'obj_init_pos': np.array([0, 0.6, 0.02]),
+            'obj_init_pos': np.array([0, 0.65, 0.02]),
         }
         
         # push-2
         self.init_config2 = {
             'obj_init_angle': .3,
-            'obj_init_pos': np.array([0, 0.4, 0.02]),
+            'obj_init_pos': np.array([-0.1, 0.5, 0.02]),
         }
         
     
@@ -352,9 +352,10 @@ class ConcurrentSawyerEnv(SawyerXYZEnv):
         
         if push_2_init:
             print("push_2 init!")
-            self.move_to_fixedpoint()
+            # self.move_to_fixedpoint()
         self.num_resets += 1
         
+        self.stablize() # stablizing the hand to make it easier
         return self._get_obs()
 
     def reset_model_to_idx(self, idx):
@@ -662,6 +663,25 @@ class ConcurrentSawyerEnv(SawyerXYZEnv):
         # demo_json = json.dumps(demonstration, sort_keys=False, indent=4)
         # f = open("./log/simulator_fixed_point_traj.json", 'w')
         # f.write(demo_json)
+    
+    
+    def stablize(self):
+        for _ in range(10):
+            action = np.array([0, 0, 0, 0])
+            if self.rotMode == 'euler':
+                action_ = np.zeros(7)
+                action_[:3] = action[:3]
+                action_[3:] = euler2quat(action[3:6])
+                self.set_xyz_action_rot(action_)
+            elif self.rotMode == 'fixed':
+                self.set_xyz_action(action[:3])
+            elif self.rotMode == 'rotz':
+                self.set_xyz_action_rotz(action[:4])
+            else:
+                self.set_xyz_action_rot(action[:7])
+            self.do_simulation([action[-1], -action[-1]])
+            # The marker seems to get reset every time you do a simulation
+            self._set_goal_marker(self._state_goal)
     
     def move_to_fixedpoint_2(self):
         import json

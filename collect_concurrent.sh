@@ -1,12 +1,8 @@
-python concurrent_test.py \
-    --expert_policy_file policy/expert/MT50_Fixed/push-v1.pth \
-	--exp_name bc_reach \
-    --n_iter 1 \
+python starter/collect_concurrent.py \
+    --n_iter 50 \
     --eval_interval 1 \
-    --render_interval 40 \
     --learning_rate 1e-4 \
-	--video_log_freq -1 \
-    --ep_len 200 \
+    --ep_len 800 \
     --batch_size 64 \
     --train_batch_size 32 \
     --config config/concurrent.json \
@@ -15,6 +11,8 @@ python concurrent_test.py \
     --worker_nums 1 \
     --eval_worker_nums 1 \
     --task_env MT50_task_env \
-    --task_name concurrent \
+    --gradient_steps 100 \
+    --expert_num 3 \
+    --no_cuda \
     --interface true \
-    --no_cuda 
+    --interface_num 5

@@ -21,7 +21,7 @@ MAX_VIDEO_LEN = 40  # we overwrite this in the code below
 
 
 class RL_Trainer(object):
-    def __init__(self, env, env_cls, env_args, args, params, agent, expert_num, input_shape, task_types, plot_prefix=None, mt_flag=False):
+    def __init__(self, env, env_cls, env_args, args, params, agent, expert_num, input_shape, task_types, interface=False, plot_prefix=None, mt_flag=False):
         
         # environment
         self.env = env
@@ -46,6 +46,7 @@ class RL_Trainer(object):
         self.input_shape = input_shape
         self.expert_num = expert_num
         self.mt_flag = mt_flag
+        self.interface = interface
         
         if not os.path.isdir(plot_prefix):
             os.makedirs(plot_prefix)
@@ -66,31 +67,36 @@ class RL_Trainer(object):
         )
     
     
-    def collect_expert_demo(self):
+    def collect_expert_demo(self, stdscr=None):
         # collect trajectories, to be used for training
-        
-        for i in range(self.expert_num):
-            TAG = str(i+1)
-            if self.mt_flag == False:
-                if self.args["task_types"] == "push-1":   # concurrent learning both push-1 and push-2
-                    expert_file_path = ["../Expert/Concurrent/" + TAG + "/push_1.json", "../Expert/Concurrent/" + TAG + "/push_3.json"]
-                elif self.args["task_types"] == "push-2":
-                    expert_file_path = ["../Expert/Concurrent/" + TAG + "/push_2.json"]
+        if self.interface:
+            training_returns = self.expert_env.interface(action_file=[], tag=None, stdscr=stdscr, prefix=self.plot_prefix)
+            
+        else:
+            for i in range(self.expert_num):
+                TAG = str(i+1)
+                if self.mt_flag == False:
+                    if self.args["task_types"] == "push-1":   # concurrent learning both push-1 and push-2
+                        # expert_file_path = ["../Expert/Concurrent/" + TAG + "/push_1.json", "../Expert/Concurrent/" + TAG + "/push_3.json"]
+                        expert_file_path = ["./Expert/HandCollect/" + TAG + "/expert_demo_1.json", "./Expert/HandCollect/" + TAG + "/expert_demo_5.json"]
+                    elif self.args["task_types"] == "push-2":
+                        # expert_file_path = ["../Expert/Concurrent/" + TAG + "/push_2.json"]
+                        expert_file_path = ["./Expert/HandCollect/" + TAG + "/expert_demo_3.json"]
+                    else:
+                        raise NotImplementedError("Invalid task_type!" + self.args["task_types"])
                 else:
-                    raise NotImplementedError("Invalid task_type!" + self.args["task_types"])
-            else:
-                expert_file_path = ["../Expert/Concurrent/" + TAG + "/push_1.json", "../Expert/Concurrent/"+ TAG + "/1.json", "../Expert/Concurrent/" + TAG + "/push_2.json", "../Expert/Concurrent/"+ TAG + "/2.json", "../Expert/Concurrent/" + TAG + "/push_3.json"]
+                    # expert_file_path = ["../Expert/Concurrent/" + TAG + "/push_1.json", "../Expert/Concurrent/"+ TAG + "/1.json", "../Expert/Concurrent/" + TAG + "/push_2.json", "../Expert/Concurrent/"+ TAG + "/2.json", "../Expert/Concurrent/" + TAG + "/push_3.json"]
+                    expert_file_path = ["./Expert/HandCollect/" + TAG + "/expert_demo_1.json",  "./Expert/HandCollect/" + TAG + "/expert_demo_2.json", "./Expert/HandCollect/" + TAG + "/expert_demo_3.json", "./Expert/HandCollect/" + TAG + "/expert_demo_4.json", "./Expert/HandCollect/" + TAG + "/expert_demo_5.json"]
+                training_returns = self.expert_env.sample_expert(action_file=expert_file_path, render=True, log=True, plot_prefix = self.plot_prefix, tag = TAG)
             
-            training_returns = self.expert_env.sample_expert(action_file=expert_file_path, render=True, log=True, plot_prefix = self.plot_prefix, tag = TAG)
-        
-            paths, envsteps_this_batch= training_returns
-            self.total_envsteps += envsteps_this_batch
-            
-            # add collected data to replay buffer
-            self.agent.add_to_replay_buffer(paths)
+                paths, envsteps_this_batch= training_returns
+                self.total_envsteps += envsteps_this_batch
                 
-        print("total training samples: ", self.total_envsteps)
-
+                # add collected data to replay buffer
+                self.agent.add_to_replay_buffer(paths)
+                    
+            print("total training samples: ", self.total_envsteps)
+            exit(0)
 
     def run_training_loop(self, n_iter, stdscr=None):
         """
@@ -109,7 +115,12 @@ class RL_Trainer(object):
         loss_curve = []
         agent_success_curve = []
     
-    
+        # collect trajectory interface
+        if self.interface:
+            self.collect_expert_demo(stdscr=stdscr)
+            return 
+        
+        
         # TRAIN
         for itr in range(n_iter):
             print("\n\n-------------------------------- Iteration %i -------------------------------- "%itr)
@@ -118,7 +129,7 @@ class RL_Trainer(object):
         
 
             if itr == 0:
-                self.collect_expert_demo()
+                self.collect_expert_demo(stdscr=stdscr)
             
             # train agent (using sampled data from replay buffer)
             training_logs = self.train_agent()  # whether or not do alternate training
@@ -155,7 +166,7 @@ class RL_Trainer(object):
         
         # TEST
         print("\n\n-------------------------------- Test Results -------------------------------- ")
-        render = True
+        render = False
         
         # prepare to save model
         import os.path as osp
@@ -202,6 +213,12 @@ class RL_Trainer(object):
             
         return all_logs
             
+    def test_agent(self):
+        # TEST
+        print("\n\n-------------------------------- Test Results -------------------------------- ")
+        render = True
+        success_dict = self.expert_env.run_agent(policy=self.agent.actor, render=render, log=True, log_prefix = self.plot_prefix, n_iter="test")
+        
             
     def plot_single_curve(self, curve, tag, plot_prefix, task_name):
         iteration = range(1, len(curve)+1)

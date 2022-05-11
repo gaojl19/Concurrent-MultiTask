@@ -2,12 +2,14 @@ from curses import KEY_BACKSPACE
 from operator import index
 from os import lockf
 from re import L
+from sys import prefix
 from tokenize import Single
 import numpy as np
 import torch
 import time
 import copy
 import imageio
+import json
 from utils.utils import *
 from metaworld_utils.meta_env import generate_single_mt_env
 
@@ -274,8 +276,202 @@ class ConcurrentCollector():
         }
         return success_dict
     
+    def keyboar2action(self, stdscr):
+        # collect 4 action dimensions
+        import curses
+        # TODO: add more levels that can cover all actions ranging from (-1,1)
+        act = [np.random.randn()/100,np.random.randn()/100,np.random.randn()/100,np.random.randn()/100]
+        small_step = 0.2
+        medium_step = 0.5
+        large_step = 0.8
+        cnt = 0
+        
+        while cnt < 4:
+            noise = np.random.randn()/10
+            keycode = stdscr.getch()
+            
+            # small steps
+            if keycode == ord("3"):
+                act[2] = small_step+noise
+                print("z Up small")
+            elif keycode == ord("e"):
+                act[2] = -small_step-noise
+                print("z Down small")
+            elif keycode == ord("u"):
+                act[1] = -small_step-noise
+                print("y left small")
+            elif keycode == ord("7"):
+                act[1] = small_step+noise
+                print("y right small")
+            elif keycode == ord('['):
+                act[0] = -small_step-0.1-noise
+                print("x front small")
+            elif keycode == ord(']'):
+                act[0] = small_step+0.1+noise
+                print("x back small")
+                
+            # medium steps
+            elif keycode == ord('2'):
+                act[2] = medium_step+noise
+                print("z Up medium")
+            elif keycode == ord('w'):
+                act[2] = -medium_step-noise
+                print("z Down medium")
+            elif keycode == ord('y'):
+                act[1] = -medium_step-noise
+                print("y left medium")
+            elif keycode == ord('6'):
+                act[1] = medium_step+noise
+                print("y right medium")
+            elif keycode == ord(';'):
+                act[0] = -medium_step-0.1-noise
+                print("x front medium")
+            elif keycode == ord("'"):
+                act[0] = medium_step+0.1+noise
+                print("x back medium")
+            
+            
+            # largs steps
+            elif keycode == ord("t"):
+                act[1] = -large_step-noise*2
+                print("y left big")
+            elif keycode == ord("5"):
+                act[1] = large_step+noise*2
+                print("y right big")
+            elif keycode == ord("1"):
+                act[2] = large_step+noise*2
+                print("z up big")
+            elif keycode == ord("q"):
+                act[2] = -large_step-noise*2
+                print("z down big")
+            elif keycode == ord(","):
+                act[0] = -large_step-1-noise
+                print("x front big")
+            elif keycode == ord("."):
+                act[0] = large_step+1+noise
+                print("x back big")
+                
+                  
+            # gripper
+            elif keycode == ord('='):
+                act[3] = -0.6-noise*3
+                print("gripper open")
+            elif keycode == ord('-'):
+                act[3] = 0.6+noise*3
+                print("gripper close")
+                
+           
+            elif keycode == ord(' '):
+                pass
+                print("no moves")
+            elif keycode == ord('x'):
+                print("exit interface")
+                return np.array([-1,-1,-1,-1])
+
+            elif keycode == ord("p"):
+                print("mark")
+                return np.array([1,1,1,1])
+            
+            elif keycode == ord('0'):
+                print("reset interface")
+                return np.array([0,0,0,0])
+            else:
+                continue
+            
+            cnt += 1
+        # print(act)
+        return np.array(act)
+        
+    def start_human_demo(self, stdscr, env, prefix):
+        
+        interface_acs = []
+        image_obs_left = []
+        image_obs_front = []
+        
+        sub_traj = []
+        
+        success_push_1 = 0
+        success_push_2 = 0
+        push_dist1 = 1
+        push_dist2 = 1
+        steps = 0
+        
+        while True:
+            act = self.keyboar2action(stdscr)
+            if (act == np.array([0,0,0,0])).all():
+                return True # reset
+                
+            elif (act == np.array([-1,-1,-1,-1])).all():
+                interface_acs.append(sub_traj)
+                
+                # save observation and action file
+                for i in range(len(interface_acs)):
+                    demonstration = {}
+                    demonstration["actions"] = interface_acs[i]
+                    demo_json = json.dumps(demonstration, sort_keys=False, indent=4)
+                    f = open(prefix + "expert_demo_" + str(i+1) + ".json", 'w')
+                    f.write(demo_json)
+                    f.close()
+                print("action length: ", steps, "trajs: ", len(interface_acs))
+                
+                # replot demo
+                if len(image_obs_front)>0:
+                    imageio.mimsave(prefix + "expert_front.gif", image_obs_front)
+                
+                if len(image_obs_left)>0:
+                    imageio.mimsave(prefix + "expert_left.gif", image_obs_left)
+                    
+                return False  # done
+            
+            elif (act == np.array([1,1,1,1])).all():
+                # mark trajectory phase
+                interface_acs.append(sub_traj)
+                sub_traj = []
+                continue
+            
+            # take that action and record results
+            ob, r, done, info = env.step(act)
+            # print(ob)
+            # ob = np.concatenate((ob[:6], ob[9:12]))
+            ob = ob[:3]
+            sub_traj.append(act.tolist())
+            
+            # record result of taking that action
+            steps += 1
+            print(ob)
+            
+            # only support rbg_array mode currently
+            image = env.get_image(400,400,'leftview')
+            image_obs_left.append(image)
+            image = env.get_image(400,400,'topview')
+            image_obs_front.append(image)
+
+            print(len(image_obs_front))
+            if len(image_obs_front)>0:
+                # imageio.mimsave(log_prefix + str(n_iter) + "_trial.gif", image_obs)
+                if len(image_obs_front)<10:
+                    imageio.mimsave(prefix + "expert_front.gif", image_obs_front)
+                else: 
+                    imageio.mimsave(prefix + "expert_front.gif", image_obs_front[len(image_obs_front)-10:])
+
+            if len(image_obs_left)>0:
+                # imageio.mimsave(log_prefix + str(n_iter) + "_trial.gif", image_obs)
+                if len(image_obs_left)<10:
+                    imageio.mimsave(prefix + "expert_left.gif", image_obs_left)
+                else: 
+                    imageio.mimsave(prefix + "expert_left.gif", image_obs_left[len(image_obs_left)-10:])
+            
+            success_push_1 = max(success_push_1, info["success_push_1"])
+            success_push_2 = max(success_push_2, info["success_push_2"])
+            push_dist1 = min(push_dist1, info["pushDist1"])
+            push_dist2 = min(push_dist2, info["pushDist2"])
+            
+            print("push1: ", push_dist1, success_push_1)
+            print("push2: ", push_dist2, success_push_2) 
+            
+                        
     # the policy gradient should be frozen before sending into this function
-    def interface(self, action_file, tag, stdscr):  
+    def interface(self, action_file, tag, stdscr, prefix):  
         
         render=True
         # initialize env for the beginning of a new rollout
@@ -284,6 +480,13 @@ class ConcurrentCollector():
         ob = env.reset()
         # ob = np.concatenate((ob[:6], ob[9:12]))
         ob = np.concatenate((ob[:6], ob[9:12]))
+        
+        
+        if len(action_file) == 0:
+            print("collecting interface!")
+            reset = True
+            while reset:
+                reset = self.start_human_demo(stdscr, env, prefix)
         
         # init vars
         obs, acs, rewards, next_obs, terminals, image_obs_front, image_obs_left, embedding_input, index_input = [], [], [], [], [], [], [], [], []
@@ -382,102 +585,7 @@ class ConcurrentCollector():
             
             print("push1: ", push_dist1, success_push_1)
             print("push2: ", push_dist2, success_push_2) 
-                
-            import curses
-            # human sample 
-            # TODO: add more levels that can cover all actions ranging from (-1,1)
-            interface_acs = []
-            while True:
-                keycode = stdscr.getch()
-                if keycode == curses.KEY_UP:
-                    noise = np.random.randn()/10
-                    act = np.array([0, 0, 0.2+noise, 0])
-                    print("z Up")
-                elif keycode == curses.KEY_DOWN:
-                    noise = np.random.randn()/10
-                    act = np.array([0, 0, -0.2-noise, 0])
-                    print("z Down")
-                elif keycode == curses.KEY_LEFT:
-                    noise = np.random.randn()/10
-                    act = np.array([0, -0.2-noise, 0, 0])
-                    print("y left")
-                elif keycode == curses.KEY_RIGHT:
-                    noise = np.random.randn()/10
-                    act = np.array([0, 0.2+noise, 0, 0])
-                    print("y right")
-                elif keycode == ord('['):
-                    noise = np.random.randn()/10
-                    act = np.array([-0.3-noise, 0, 0, 0])
-                    print("x front")
-                elif keycode == ord(']'):
-                    noise = np.random.randn()/10
-                    act = np.array([0.3+noise, 0, 0, 0])
-                    print("x back")
-                elif keycode == ord('='):
-                    noise = np.random.randn()/5
-                    act = np.array([0, 0, 0, -0.6-noise])
-                    print("gripper open")
-                elif keycode == ord('-'):
-                    noise = np.random.randn()/5
-                    act = np.array([0, 0, 0, 0.6+noise])
-                    print("gripper close")
-                elif keycode == ord("a"):
-                    noise = np.random.randn()/10
-                    act = np.array([0, -0.7-noise, 0, 0])
-                    print("y left big")
-                elif keycode == ord("d"):
-                    noise = np.random.randn()/10
-                    act = np.array([0, 0.7+noise, 0, 0])
-                    print("y right big")
-                elif keycode == ord("w"):
-                    noise = np.random.randn()/10
-                    act = np.array([0, 0, 0.7+noise, 0])
-                    print("z up big")
-                elif keycode == ord("s"):
-                    noise = np.random.randn()/10
-                    act = np.array([0, 0, -0.7-noise, 0])
-                    print("z down big")
-                elif keycode == ord('o'):
-                    act = np.array([0, 0, 0, 0])
-                    print("no moves")
-                elif keycode == ord('x'):
-                    # save observation and action file
-                    demonstration = {"actions": interface_acs}
-                    demo_json = json.dumps(demonstration, sort_keys=False, indent=4)
-                    f = open("../Expert/" + str(index) + ".json", 'w')
-                    f.write(demo_json)
-                    print(len(interface_acs))
-                    break
-                else:
-                    continue
-                    
-                # take that action and record results
-                ob, r, done, info = env.step(act)
-                # print(ob)
-                # ob = np.concatenate((ob[:6], ob[9:12]))
-                ob = ob[:3]
-                interface_acs.append(act.tolist())
-                
-                # record result of taking that action
-                steps += 1
-                next_obs.append(ob)
-                print(ob)
-                rewards.append(r)
-                
-                # only support rbg_array mode currently
-                if render:
-                    # image_obs.append(env.render(mode='rgb_array'))
-                    image = env.get_image(400,400,'leftview')
-                    image_obs_left.append(image)
-                    image = env.get_image(400,400,'topview')
-                    image_obs_front.append(image)
-
-                    if len(image_obs_front)>0:
-                        # imageio.mimsave(log_prefix + str(n_iter) + "_trial.gif", image_obs)
-                        imageio.mimsave("../Expert/Concurrent/" + tag + "_front.gif", image_obs_front[steps-10:])
-        
-                    if len(image_obs_left)>0:
-                        # imageio.mimsave(log_prefix + str(n_iter) + "_trial.gif", image_obs)
-                        imageio.mimsave("../Expert/Concurrent/" + tag + "_left.gif", image_obs_left[steps-10:])
+            
+            self.start_human_demo(stdscr, env, prefix)
             
             
