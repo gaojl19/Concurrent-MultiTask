@@ -21,7 +21,7 @@ MAX_VIDEO_LEN = 40  # we overwrite this in the code below
 
 
 class RL_Trainer(object):
-    def __init__(self, env, env_cls, env_args, args, params, agent, expert_num, input_shape, task_types, interface=False, plot_prefix=None, mt_flag=False):
+    def __init__(self, env, env_cls, env_args, args, params, agent, expert_num, input_shape, task_types, interface=False, plot_prefix=None, mt_flag=False, idx_flag=False):
         
         # environment
         self.env = env
@@ -47,6 +47,7 @@ class RL_Trainer(object):
         self.expert_num = expert_num
         self.mt_flag = mt_flag
         self.interface = interface
+        self.idx_flag = idx_flag
         
         if not os.path.isdir(plot_prefix):
             os.makedirs(plot_prefix)
@@ -96,7 +97,6 @@ class RL_Trainer(object):
                 self.agent.add_to_replay_buffer(paths)
                     
             print("total training samples: ", self.total_envsteps)
-            exit(0)
 
     def run_training_loop(self, n_iter, stdscr=None):
         """
@@ -149,7 +149,7 @@ class RL_Trainer(object):
                 print("\n\n-------------------------------- Evaluating Iteration %i -------------------------------- "%itr)
                 render = self.params["general_setting"]["eval_render"]
                 
-                success_dict = self.expert_env.run_agent(policy=self.agent.actor, render=render, log=True, log_prefix = self.plot_prefix, n_iter=itr)
+                success_dict = self.expert_env.run_agent(policy=self.agent.actor, render=render, log=True, log_prefix = self.plot_prefix, n_iter=itr, use_index=self.idx_flag)
                 agent_success_curve.append(success_dict)
                 
                 eval_time = time.time() - eval_start_time
@@ -165,19 +165,13 @@ class RL_Trainer(object):
                 break
         
         # TEST
-        print("\n\n-------------------------------- Test Results -------------------------------- ")
-        render = False
+        success_dict = self.test_agent()
         
         # prepare to save model
         import os.path as osp
         model_file_name="model.pth"
         model_path=osp.join(self.plot_prefix, model_file_name)
-        
-        success_dict = self.expert_env.run_agent(policy=self.agent.actor, render=render, log=True, log_prefix = self.plot_prefix, n_iter=itr)
-        torch.save(self.agent.actor.state_dict(), model_path)
-        # else:
-        #     success_dict = self.expert_env.run_agent(log_prefix=self.plot_prefix, agent_policy=self.agent.actor.policy, input_shape = self.agent.actor.input_shape, render=render)
-        #     torch.save(self.agent.actor.state_dict(), model_path)
+        torch.save(self.agent.actor.policy.state_dict(), model_path)
 
         
         # PLOT CURVE
@@ -192,9 +186,6 @@ class RL_Trainer(object):
         fig = ax.get_figure()
         fig.savefig(self.plot_prefix + "Loss_lr_"+str(self.args['learning_rate']*10000)+".png")
         fig.clf()
-        
-        # plot expert success curve
-        # self.plot_success_curve(expert_success_curve, "expert", self.plot_prefix)
         
         # plot agent success curve
         self.plot_success_curve(agent_success_curve, self.plot_prefix)
@@ -217,8 +208,9 @@ class RL_Trainer(object):
         # TEST
         print("\n\n-------------------------------- Test Results -------------------------------- ")
         render = True
-        success_dict = self.expert_env.run_agent(policy=self.agent.actor, render=render, log=True, log_prefix = self.plot_prefix, n_iter="test")
-        
+        success_dict = self.expert_env.run_agent(policy=self.agent.actor, render=render, log=True, log_prefix = self.plot_prefix, n_iter="test", use_index=self.idx_flag)
+    
+        return success_dict
             
     def plot_single_curve(self, curve, tag, plot_prefix, task_name):
         iteration = range(1, len(curve)+1)

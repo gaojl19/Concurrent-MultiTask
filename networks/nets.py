@@ -367,7 +367,6 @@ class BootstrappedNet(Net):
     # TODO: understand this part!
     def forward(self, x, idx):
         base_shape = x.shape[:-1]
-    
         # print("base shape: ", base_shape) # [batch_size, 1]
         out = super().forward(x)
         # print("out: ", out.shape)

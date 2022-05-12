@@ -180,15 +180,17 @@ class ConcurrentCollector():
         return paths, timesteps_this_batch
     
     
-    def run_agent(self, policy, render=False, log = False, log_prefix = "./", n_iter=0, use_embedding=False):
+    def run_agent(self, policy, render=False, log = False, log_prefix = "./", n_iter=0, use_index=False):
         
         # initialize env for the beginning of a new rollout
         success_push_1 = 0
         success_push_2 = 0
         push_dist1 = 1
         push_dist2 = 1
+        idx = 0
         
         # test push-1 and push-2 sequentially
+        # if only push-1/push-2, test 1
         for task in self.task_types:
             env = self.env_info.env
             env.eval()
@@ -208,16 +210,15 @@ class ConcurrentCollector():
                 embedding_input.append(self.embedding_input)
                 index_input.append(self.index_input)
                 
-                # use the most recent ob to decide what to do
-                if use_embedding:
-                    ob = ob[:policy.input_shape-self.embedding_input.shape[1]]
-                    obs.append(ob)
-                    ob = torch.Tensor(np.concatenate((ob, self.embedding_input.squeeze())))
+                ob = ob[:policy.input_shape]
+                obs.append(ob)
+                
+                if use_index:
+                    # print(torch.LongTensor([idx]).reshape(-1, 1))
+                    act = policy.get_action(torch.Tensor(ob).to(self.device).unsqueeze(0), torch.LongTensor([idx]).reshape(-1, 1)).detach().cpu().numpy()
                 else:
-                    ob = ob[:policy.input_shape]
-                    obs.append(ob)
+                    act = policy.get_action(torch.Tensor(ob).to(self.device).unsqueeze(0)).detach().cpu().numpy()
                     
-                act = policy.get_action(torch.Tensor(ob).to(self.device).unsqueeze(0)).detach().cpu().numpy()
                 act = np.squeeze(act)
                 # log_info += "agent:" + str(act) + "\n"
                     
@@ -225,10 +226,7 @@ class ConcurrentCollector():
                 
                 # take that action and record results
                 ob, r, done, info = env.step(act)
-                if use_embedding:
-                    ob = ob[:policy.input_shape-self.embedding_input.shape[1]]
-                else:
-                    ob = ob[:policy.input_shape]
+                ob = ob[:policy.input_shape]
                 
                 # record result of taking that action
                 steps += 1
@@ -259,6 +257,8 @@ class ConcurrentCollector():
                 imageio.mimsave(log_prefix + str(n_iter) + "_" + task + "_agent_front.gif", image_obs_front)
             if len(image_obs_left)>0:
                 imageio.mimsave(log_prefix + str(n_iter) + "_" + task +"_agent_left.gif", image_obs_left)
+                
+            idx += 1
         
         
         log_info += "agent_success_push_1: " + str(success_push_1) + "\n"

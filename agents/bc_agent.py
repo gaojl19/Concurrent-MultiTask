@@ -2,7 +2,7 @@ from statistics import variance
 from torch_rl.replay_buffer import ReplayBuffer
 from policy.MLP_policy import MLPPolicy
 from policy.Soft_Module_policy import SoftModulePolicy
-from policy.MH_SAC_policy import MHSACPolicy
+from policy.MultiHead_policy import MultiHeadPolicy
 from policy.IQ_learn_policy import *
 from policy.Disentanglement_policy import DisentanglementPolicy, DisentangleMultiHeadPolicy
 from .base_agent import BaseAgent
@@ -309,17 +309,19 @@ class SoftModuleAgent(BaseAgent):
     
     
     
-class MHSACAgent(BaseAgent):
+class MultiHeadAgent(BaseAgent):
     def __init__(self, env, agent_params, params):
-        super(MHSACAgent, self).__init__()
+        super(MultiHeadAgent, self).__init__()
 
         # init vars
         self.env = env
         self.agent_params = agent_params
 
         # actor/policy
-        self.actor = MHSACPolicy(
-            env = env,
+        self.actor = MultiHeadPolicy(
+            input_shape = self.agent_params['ob_dim'],
+            output_shape = self.agent_params['ac_dim'],
+            head_num = self.agent_params["head_num"],
             params = params
         )
         
@@ -336,11 +338,11 @@ class MHSACAgent(BaseAgent):
         # replay buffer
         self.replay_buffer = ReplayBuffer(self.agent_params['max_replay_buffer_size'])
 
-    def train(self, ob_no, ac_na, index_input_n):
+    def train(self, ob_no, ac_na):
         self.actor.train()
         
         self.optimizer.zero_grad()
-        pred_acs = self.actor(ob_no, index_input_n.squeeze())
+        pred_acs = self.actor(ob_no, None)
         loss = self.loss(pred_acs, ac_na)
 
         loss.backward()
@@ -354,7 +356,13 @@ class MHSACAgent(BaseAgent):
 
     def add_mt_to_replay_buffer(self, paths):
         self.replay_buffer.add_index_rollouts(paths)
+    
+    def add_to_replay_buffer(self, paths):
+        self.replay_buffer.add_rollouts(paths)
 
+    def sample(self, batch_size):
+        return self.replay_buffer.sample_random_data(batch_size) 
+    
     def mt_sample(self, batch_size):
         return self.replay_buffer.sample_random_data_index(batch_size)
 
