@@ -1,4 +1,4 @@
-python starter/mlp_baseline.py \
+python starter/gaussian_baseline.py \
     --n_iter 50 \
     --eval_interval 1 \
     --learning_rate 1e-4 \
@@ -15,7 +15,7 @@ python starter/mlp_baseline.py \
     --expert_num 3 \
     --no_cuda \
     --test true \
-    --load_from_checkpoint ./fig/baseline.pth
+    --load_from_checkpoint ./fig/gaussian_baseline.pth
 
 
 # python starter/separate_mlp_baseline.py \

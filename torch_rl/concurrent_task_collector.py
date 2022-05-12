@@ -215,7 +215,7 @@ class ConcurrentCollector():
                 
                 if use_index:
                     # print(torch.LongTensor([idx]).reshape(-1, 1))
-                    act = policy.get_action(torch.Tensor(ob).to(self.device).unsqueeze(0), torch.LongTensor([idx]).reshape(-1, 1)).detach().cpu().numpy()
+                    act = policy.get_action(torch.Tensor(ob).to(self.device).unsqueeze(0), torch.LongTensor([idx]).reshape(-1, 1))
                 else:
                     act = policy.get_action(torch.Tensor(ob).to(self.device).unsqueeze(0)).detach().cpu().numpy()
                     
@@ -261,11 +261,11 @@ class ConcurrentCollector():
             idx += 1
         
         
-        log_info += "agent_success_push_1: " + str(success_push_1) + "\n"
-        log_info += "agent_success_push_2: " + str(success_push_2) + "\n"
-        log_info += "agent_push_1: " +  str(push_dist1) + "\n"
-        log_info += "agent_push_2: " + str(push_dist2) + "\n"
-        log_info += "path_length: " + str(len(acs)) + "\n"     
+            log_info += "agent_success_push_1: " + str(success_push_1) + "\n"
+            log_info += "agent_success_push_2: " + str(success_push_2) + "\n"
+            log_info += "agent_push_1: " +  str(push_dist1) + "\n"
+            log_info += "agent_push_2: " + str(push_dist2) + "\n"
+            log_info += "path_length: " + str(len(acs)) + "\n"     
         
         if log == True:
             print(log_info)

@@ -158,6 +158,11 @@ class RL_Trainer(object):
                 print("epoch time: ", time.time() - start)
                 for log in training_logs:
                     print("loss: ", log["Training Loss"])
+                    
+                # save model
+                if success_dict["push_1"] and success_dict["push_2"]:
+                    print("both success! saving model!")
+                    self.save_model("success")
             
             if min_loss < 0.0001:
                 print("\n\n-------------------------------- Training stopped due to early stopping -------------------------------- ")
@@ -166,12 +171,7 @@ class RL_Trainer(object):
         
         # TEST
         success_dict = self.test_agent()
-        
-        # prepare to save model
-        import os.path as osp
-        model_file_name="model.pth"
-        model_path=osp.join(self.plot_prefix, model_file_name)
-        torch.save(self.agent.actor.policy.state_dict(), model_path)
+        self.save_model("finish")
 
         
         # PLOT CURVE
@@ -189,7 +189,12 @@ class RL_Trainer(object):
         
         # plot agent success curve
         self.plot_success_curve(agent_success_curve, self.plot_prefix)
-   
+    
+    def save_model(self, tag=""):
+        import os.path as osp
+        model_file_name = tag + "_model.pth"
+        model_path=osp.join(self.plot_prefix, model_file_name)
+        torch.save(self.agent.actor.policy.state_dict(), model_path)
     
     def train_agent(self):
         all_logs = []

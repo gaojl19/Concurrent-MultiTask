@@ -66,6 +66,6 @@ python starter/separate_gaussian_baseline.py \
     --eval_worker_nums 1 \
     --task_env MT50_task_env \
     --gradient_steps 100 \
-    --expert_num 5 \
+    --expert_num 1 \
     --task_types push-2\
     --no_cuda 
