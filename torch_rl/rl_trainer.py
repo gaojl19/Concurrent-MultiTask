@@ -122,6 +122,7 @@ class RL_Trainer(object):
         
         
         # TRAIN
+        max_success = 0
         for itr in range(n_iter):
             print("\n\n-------------------------------- Iteration %i -------------------------------- "%itr)
             start = time.time()
@@ -160,9 +161,18 @@ class RL_Trainer(object):
                     print("loss: ", log["Training Loss"])
                     
                 # save model
+                if success_dict["push_1"]+success_dict["push_2"] > max_success:
+                    print("max success! saving model!")
+                    self.save_model("max_success")
+                    max_success = success_dict["push_1"]+success_dict["push_2"]
+                    
                 if success_dict["push_1"] and success_dict["push_2"]:
                     print("both success! saving model!")
-                    self.save_model("success")
+                    self.save_model("both_success")
+                
+                if success_dict["success"]:
+                    print("task success! saving model!")
+                    self.save_model("task_success")
             
             if min_loss < 0.0001:
                 print("\n\n-------------------------------- Training stopped due to early stopping -------------------------------- ")

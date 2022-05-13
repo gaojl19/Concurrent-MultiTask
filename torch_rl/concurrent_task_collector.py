@@ -188,10 +188,19 @@ class ConcurrentCollector():
         push_dist1 = 1
         push_dist2 = 1
         idx = 0
+        success_sum = 0
+        success_flag = True
+        
+        log_info = ""
         
         # test push-1 and push-2 sequentially
         # if only push-1/push-2, test 1
         for task in self.task_types:
+            success_1 = 0
+            success_2 = 0
+            dist_1 = 1
+            dist_2 = 1
+            
             env = self.env_info.env
             env.eval()
             if task == "push-2":
@@ -199,7 +208,7 @@ class ConcurrentCollector():
             else:
                 ob = env.reset()
                 
-            log_info = "initial ob: " + str(ob) + "\n"
+            log_info += "initial ob: " + str(ob) + "\n"
             
             # init vars
             obs, acs, rewards, next_obs, terminals, image_obs_front, image_obs_left, embedding_input, index_input = [], [], [], [], [], [], [], [], []
@@ -240,10 +249,10 @@ class ConcurrentCollector():
                     image = env.get_image(400,400,'frontview')
                     image_obs_front.append(image)
                 
-                success_push_1 = max(success_push_1, info["success_push_1"])
-                success_push_2 = max(success_push_2, info["success_push_2"])
-                push_dist1 = min(push_dist1, info["pushDist1"])
-                push_dist2 = min(push_dist2, info["pushDist2"])
+                success_1 = max(success_1, info["success_push_1"])
+                success_2 = max(success_2, info["success_push_2"])
+                dist_1 = min(push_dist1, info["pushDist1"])
+                dist_2 = min(push_dist2, info["pushDist2"])
 
                 # end the rollout if the rollout ended
                 rollout_done = True if (done or steps>=self.max_path_length) else False
@@ -259,22 +268,31 @@ class ConcurrentCollector():
                 imageio.mimsave(log_prefix + str(n_iter) + "_" + task +"_agent_left.gif", image_obs_left)
                 
             idx += 1
-        
-        
-            log_info += "agent_success_push_1: " + str(success_push_1) + "\n"
-            log_info += "agent_success_push_2: " + str(success_push_2) + "\n"
-            log_info += "agent_push_1: " +  str(push_dist1) + "\n"
-            log_info += "agent_push_2: " + str(push_dist2) + "\n"
-            log_info += "path_length: " + str(len(acs)) + "\n"     
+            
+            success_push_1 = max(success_push_1, success_1)
+            success_push_2 = max(success_push_2, success_2)
+            
+            # must do the job sequentially
+            if (success_2==1 and success_1==1) or (success_2==0 and success_1==0):
+                success_flag = False
+            
+            log_info += "agent_success_push_1: " + str(success_1) + "\n"
+            log_info += "agent_success_push_2: " + str(success_2) + "\n"
+            log_info += "agent_push_1: " +  str(dist_1) + "\n"
+            log_info += "agent_push_2: " + str(dist_2) + "\n"
+            log_info += "path_length: " + str(len(acs)) + "\n"  
+            log_info += "success_flag: " + str(success_flag) + "\n"
         
         if log == True:
             print(log_info)
         
         success_dict={
             "push_1": success_push_1,
-            "push_2": success_push_2
+            "push_2": success_push_2,
+            "success": success_flag
         }
         return success_dict
+    
     
     def keyboar2action(self, stdscr):
         # collect 4 action dimensions
