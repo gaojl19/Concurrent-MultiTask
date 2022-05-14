@@ -357,10 +357,29 @@ class ModularGuassianGatedCascadeCondContPolicy(networks.ModularGatedCascadeCond
 
 
 class MultiHeadGuassianContPolicy(networks.BootstrappedNet):
-    def forward(self, x, idx):
-    
-        x = super().forward(x, idx)
+    def train_forward(self, x):
+        dist_out = super().train_forward(x)
+        mean_list = []
+        std_list = []
+        log_std_list = []
         
+        for x in dist_out:
+            mean, log_std = x.chunk(2, dim=-1)
+            log_std = torch.clamp(log_std, LOG_SIG_MIN, LOG_SIG_MAX)
+            
+            # calculate standard deviation
+            std = torch.exp(log_std)
+            mean_list.append(mean)
+            log_std_list.append(log_std)
+            std_list.append(std)
+            
+            # print(mean, std)
+        return mean_list, std_list, log_std_list
+        
+        
+    def forward(self, x, idx):
+        
+        x = super().forward(x, idx)
         # divide output into 2 parts: mean and covariance
         mean, log_std = x.chunk(2, dim=-1)
         

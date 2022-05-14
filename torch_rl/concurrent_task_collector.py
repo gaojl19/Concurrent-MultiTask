@@ -188,7 +188,6 @@ class ConcurrentCollector():
         push_dist1 = 1
         push_dist2 = 1
         idx = 0
-        success_sum = 0
         success_flag = True
         
         log_info = ""
@@ -251,8 +250,8 @@ class ConcurrentCollector():
                 
                 success_1 = max(success_1, info["success_push_1"])
                 success_2 = max(success_2, info["success_push_2"])
-                dist_1 = min(push_dist1, info["pushDist1"])
-                dist_2 = min(push_dist2, info["pushDist2"])
+                dist_1 = min(dist_1, info["pushDist1"])
+                dist_2 = min(dist_2, info["pushDist2"])
 
                 # end the rollout if the rollout ended
                 rollout_done = True if (done or steps>=self.max_path_length) else False

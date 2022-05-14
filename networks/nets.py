@@ -1,3 +1,4 @@
+from importlib_metadata import distribution
 import numpy as np
 import torch
 import torch.nn as nn
@@ -363,6 +364,37 @@ class BootstrappedNet(Net):
         self.origin_output_shape = output_shape
         output_shape *= self.head_num
         super().__init__(output_shape = output_shape, **kwargs)
+        
+    
+    def train_forward(self, x):
+        '''
+            get the mean and std of different heads, with grad
+        '''
+        base_shape = x.shape[:-1]
+        # print("base shape: ", base_shape) # [batch_size, 1]
+        out = super().forward(x)
+        # print("out: ", out.shape)
+        out_shape = base_shape + torch.Size([self.origin_output_shape, self.head_num])
+        # print("out_shape:", out_shape) # [batch_size, 1, 8, 1] (8 = 4 *2) or [batch_size, 1, 1, 1]
+        view_idx_shape = base_shape + torch.Size([1, 1])
+        expand_idx_shape = base_shape + torch.Size([self.origin_output_shape, 1])
+        # print("view idx shape: ", view_idx_shape)
+        # print("expane idx shape: ", expand_idx_shape)
+        
+        out = out.reshape(out_shape)
+        # print(out.shape)
+        print(out[0])
+        dist_out = []
+        for i in range(out.shape[2]):
+            idx = torch.LongTensor([i]).repeat(out.shape[0], 1)
+            
+            idx = idx.view(view_idx_shape)
+            idx = idx.expand(expand_idx_shape)
+            out_ = out.gather(-1, idx).squeeze(-1)
+            dist_out.append(out_)
+            # print("final out: ", out_.shape)
+        # exit(0)
+        return dist_out
 
     # TODO: understand this part!
     def forward(self, x, idx):
@@ -381,8 +413,6 @@ class BootstrappedNet(Net):
         idx = idx.view(view_idx_shape)
         idx = idx.expand(expand_idx_shape)
         out = out.gather(-1, idx).squeeze(-1)
-        # print("final out: ", out.shape)
-        # exit(0)
         return out
 
 

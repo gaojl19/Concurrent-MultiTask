@@ -72,7 +72,7 @@ class BC_Trainer(object):
         agent = MultiHeadAgent(self.env, self.args['agent_params'], self.params)
 
         if args["load_from_checkpoint"]:
-            agent.actor.load_state_dict(torch.load(args["load_from_checkpoint"], map_location='cpu'))
+            agent.actor.policy.load_state_dict(torch.load(args["load_from_checkpoint"], map_location='cpu'))
 
         
         # EXPERT file path
