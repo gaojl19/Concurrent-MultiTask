@@ -68,7 +68,7 @@ class BC_Trainer(object):
         self.args['agent_params']['discrete'] = discrete
         self.args['agent_params']['ac_dim'] = ac_dim
         self.args['agent_params']['ob_dim'] = ob_dim
-        self.args['agent_params']['head_num'] = TASK_NUM
+        self.args['agent_params']['head_num'] = TASK_NUM + 1
         agent = EMMultiHeadAgent(self.env, self.args['agent_params'], self.params)
 
         if args["load_from_checkpoint"]:

@@ -401,11 +401,11 @@ class EMMultiHeadAgent(BaseAgent):
         # replay buffer
         self.replay_buffer = ReplayBuffer(self.agent_params['max_replay_buffer_size'])
 
-    def train(self, ob_no, ac_na):
+    def train(self, ob_no, ac_na, idx, log=False):
         self.actor.policy.train()
         
         self.optimizer.zero_grad()
-        loss= self.actor.train_forward(ob_no, ac_na, self.loss)
+        loss= self.actor.train_forward(ob_no, ac_na, idx, self.loss, log)
 
         loss.backward()
         
@@ -419,18 +419,15 @@ class EMMultiHeadAgent(BaseAgent):
             'Training Loss': loss.to('cpu').detach().numpy(),
         } 
         return log
-
-    def add_mt_to_replay_buffer(self, paths):
-        self.replay_buffer.add_index_rollouts(paths)
     
     def add_to_replay_buffer(self, paths):
-        self.replay_buffer.add_rollouts(paths)
+        self.replay_buffer.add_index_rollouts(paths)
 
     def sample(self, batch_size):
         '''
             in order for EM algorithms to converge, it must be fitted with the complete dataset
         '''
-        return self.replay_buffer.sample_random_data(batch_size, complete=False) 
+        return self.replay_buffer.sample_random_data_index(batch_size, complete=False) 
     
     def mt_sample(self, batch_size):
         return self.replay_buffer.sample_random_data_index(batch_size)

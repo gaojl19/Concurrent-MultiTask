@@ -383,7 +383,7 @@ class BootstrappedNet(Net):
         
         out = out.reshape(out_shape)
         # print(out.shape)
-        print(out[0])
+        # print(out[0])
         dist_out = []
         for i in range(out.shape[2]):
             idx = torch.LongTensor([i]).repeat(out.shape[0], 1)

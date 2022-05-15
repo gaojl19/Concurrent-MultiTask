@@ -210,10 +210,14 @@ class RL_Trainer(object):
         all_logs = []
  
         for _ in range(self.args['gradient_steps']):
-
+            log = True if _%self.args['gradient_steps'] == 0 else False
             # sample some data from the data buffer, and train on that batch
-            ob_batch, ac_batch = self.agent.sample(self.args['train_batch_size'])
-            train_log = self.agent.train(ob_batch, ac_batch)
+            if self.idx_flag:
+                ob_batch, ac_batch, index_batch = self.agent.sample(self.args['train_batch_size'])
+                train_log = self.agent.train(ob_batch, ac_batch, index_batch, log=log)
+            else:
+                ob_batch, ac_batch = self.agent.sample(self.args['train_batch_size'])
+                train_log = self.agent.train(ob_batch, ac_batch)
                 
             all_logs.append(train_log)
             

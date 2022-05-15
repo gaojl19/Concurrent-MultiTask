@@ -18,7 +18,7 @@
 #     --load_from_checkpoint ./fig/gaussian_baseline.pth
 
 
-python starter/separate_gaussian_baseline.py \
+python starter/EM.py \
     --n_iter 50 \
     --eval_interval 1 \
     --learning_rate 1e-4 \
@@ -33,7 +33,6 @@ python starter/separate_gaussian_baseline.py \
     --task_env MT50_task_env \
     --gradient_steps 100 \
     --expert_num 3 \
-    --task_types push-2\
     --no_cuda \
     --test true \
-    --load_from_checkpoint ./fig/task_1_model.pth
+    --load_from_checkpoint ./fig/EM_model.pth

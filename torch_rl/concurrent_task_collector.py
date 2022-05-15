@@ -96,6 +96,15 @@ class ConcurrentCollector():
         for file in action_file:
             initial_ob = ob
             print(initial_ob)
+            
+            # add ground truth index
+            if str(file).find("expert_demo_1")!=-1 or str(file).find("expert_demo_5")!=-1:
+                idx_truth = 0
+            elif str(file).find("expert_demo_3")!=-1:
+                idx_truth = 1
+            else:
+                idx_truth = 2
+            print("file, idx truth: ", file, idx_truth)
 
             with open(file, 'r') as fin:
                 ac = json.load(fin)["actions"]
@@ -105,9 +114,8 @@ class ConcurrentCollector():
 
             print("action number: ", len(action_sequence))
             for act in action_sequence:
-                embedding_input.append(self.embedding_input)
-                index_input.append(self.index_input)
-                
+                # print(torch.LongTensor([idx_truth]))
+                index_input.append(torch.LongTensor([idx_truth]))
                 obs.append(ob[:self.input_shape])
                 act = np.array(act)
                 acs.append(act)
@@ -170,7 +178,7 @@ class ConcurrentCollector():
         if log == True:
             print(log_info)
             
-                        
+        
         paths = [Path(obs, acs, next_obs, terminals, success, embedding_input, index_input)]
         
         timesteps_this_batch = 0
