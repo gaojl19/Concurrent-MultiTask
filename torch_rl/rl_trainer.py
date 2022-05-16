@@ -21,7 +21,7 @@ MAX_VIDEO_LEN = 40  # we overwrite this in the code below
 
 
 class RL_Trainer(object):
-    def __init__(self, env, env_cls, env_args, args, params, agent, expert_num, input_shape, task_types, interface=False, plot_prefix=None, mt_flag=False, idx_flag=False):
+    def __init__(self, env, env_cls, env_args, args, params, agent, expert_num, input_shape, task_types, interface=False, plot_prefix=None, mt_flag=False, idx_flag=False, test_idx_flag=False):
         
         # environment
         self.env = env
@@ -48,6 +48,7 @@ class RL_Trainer(object):
         self.mt_flag = mt_flag
         self.interface = interface
         self.idx_flag = idx_flag
+        self.test_idx_flag = test_idx_flag
         
         if not os.path.isdir(plot_prefix):
             os.makedirs(plot_prefix)
@@ -150,7 +151,7 @@ class RL_Trainer(object):
                 print("\n\n-------------------------------- Evaluating Iteration %i -------------------------------- "%itr)
                 render = self.params["general_setting"]["eval_render"]
                 
-                success_dict = self.expert_env.run_agent(policy=self.agent.actor, render=render, log=True, log_prefix = self.plot_prefix, n_iter=itr, use_index=self.idx_flag)
+                success_dict = self.expert_env.run_agent(policy=self.agent.actor, render=render, log=True, log_prefix = self.plot_prefix, n_iter=itr, use_index=self.test_idx_flag)
                 agent_success_curve.append(success_dict)
                 
                 eval_time = time.time() - eval_start_time
@@ -213,10 +214,10 @@ class RL_Trainer(object):
             log = True if _%self.args['gradient_steps'] == 0 else False
             # sample some data from the data buffer, and train on that batch
             if self.idx_flag:
-                ob_batch, ac_batch, index_batch = self.agent.sample(self.args['train_batch_size'])
+                ob_batch, ac_batch, index_batch = self.agent.sample(self.args['train_batch_size'], self.args["train_full_data"])
                 train_log = self.agent.train(ob_batch, ac_batch, index_batch, log=log)
             else:
-                ob_batch, ac_batch = self.agent.sample(self.args['train_batch_size'])
+                ob_batch, ac_batch = self.agent.sample(self.args['train_batch_size'], self.args["train_full_data"])
                 train_log = self.agent.train(ob_batch, ac_batch)
                 
             all_logs.append(train_log)
@@ -227,7 +228,7 @@ class RL_Trainer(object):
         # TEST
         print("\n\n-------------------------------- Test Results -------------------------------- ")
         render = True
-        success_dict = self.expert_env.run_agent(policy=self.agent.actor, render=render, log=True, log_prefix = self.plot_prefix, n_iter="test", use_index=self.idx_flag)
+        success_dict = self.expert_env.run_agent(policy=self.agent.actor, render=render, log=True, log_prefix = self.plot_prefix, n_iter="test", use_index=self.test_idx_flag)
     
         return success_dict
             

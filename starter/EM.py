@@ -99,7 +99,8 @@ class BC_Trainer(object):
                                      plot_prefix=log_prefix,
                                      task_types=["push-1", "push-2"],
                                      mt_flag=True,
-                                     idx_flag=True) 
+                                     idx_flag=True,
+                                     test_idx_flag=True) 
         
     
     def run_training_loop(self, stdscr=None, interface=False):
@@ -129,6 +130,8 @@ def main():
     parser.add_argument("--test", type=bool, default=False)
     parser.add_argument("--load_from_checkpoint", type=str, default=None)
     parser.add_argument("--interface", type=bool, default=False)
+    parser.add_argument("--train_full_data", type=bool, default=False)
+    
     
     # training settings
     parser.add_argument('--ep_len', type=int)

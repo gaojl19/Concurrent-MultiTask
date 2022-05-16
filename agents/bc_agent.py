@@ -345,7 +345,7 @@ class MultiHeadAgent(BaseAgent):
         self.optimizer.zero_grad()
         pred_acs = self.actor(ob_no, None)
         loss = self.loss(pred_acs, ac_na)
-        print(loss, loss.shape)
+        # print(loss, loss.shape)
         loss.backward()
         self.optimizer.step()
         
@@ -361,8 +361,9 @@ class MultiHeadAgent(BaseAgent):
     def add_to_replay_buffer(self, paths):
         self.replay_buffer.add_rollouts(paths)
 
-    def sample(self, batch_size):
-        return self.replay_buffer.sample_random_data(batch_size) 
+    def sample(self, batch_size, complete=False):
+        print("complete: ", complete)
+        return self.replay_buffer.sample_random_data(batch_size, complete=complete) 
     
     def mt_sample(self, batch_size):
         return self.replay_buffer.sample_random_data_index(batch_size)
@@ -423,11 +424,11 @@ class EMMultiHeadAgent(BaseAgent):
     def add_to_replay_buffer(self, paths):
         self.replay_buffer.add_index_rollouts(paths)
 
-    def sample(self, batch_size):
+    def sample(self, batch_size, complete=False):
         '''
             in order for EM algorithms to converge, it must be fitted with the complete dataset
         '''
-        return self.replay_buffer.sample_random_data_index(batch_size, complete=False) 
+        return self.replay_buffer.sample_random_data_index(batch_size, complete=complete) 
     
     def mt_sample(self, batch_size):
         return self.replay_buffer.sample_random_data_index(batch_size)

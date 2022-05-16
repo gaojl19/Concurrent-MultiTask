@@ -195,14 +195,14 @@ class ConcurrentCollector():
         success_push_2 = 0
         push_dist1 = 1
         push_dist2 = 1
-        idx = 0
-        success_flag = True
+        success_flag_1 = False
+        success_flag_2 = False
         
         log_info = ""
         
         # test push-1 and push-2 sequentially
         # if only push-1/push-2, test 1
-        for task in self.task_types:
+        for idx in range(len(self.task_types)+1):
             success_1 = 0
             success_2 = 0
             dist_1 = 1
@@ -210,10 +210,8 @@ class ConcurrentCollector():
             
             env = self.env_info.env
             env.eval()
-            if task == "push-2":
-                ob = env.reset(push_2_init=True)
-            else:
-                ob = env.reset()
+            ob = env.reset()
+            print("idx: ", idx)
                 
             log_info += "initial ob: " + str(ob) + "\n"
             
@@ -223,8 +221,6 @@ class ConcurrentCollector():
             done = False
             
             while True:
-                embedding_input.append(self.embedding_input)
-                index_input.append(self.index_input)
                 
                 ob = ob[:policy.input_shape]
                 obs.append(ob)
@@ -270,9 +266,9 @@ class ConcurrentCollector():
             
                 
             if len(image_obs_front)>0:
-                imageio.mimsave(log_prefix + str(n_iter) + "_" + task + "_agent_front.gif", image_obs_front)
+                imageio.mimsave(log_prefix + str(n_iter) + "_" + str(idx)+ "_agent_front.gif", image_obs_front)
             if len(image_obs_left)>0:
-                imageio.mimsave(log_prefix + str(n_iter) + "_" + task +"_agent_left.gif", image_obs_left)
+                imageio.mimsave(log_prefix + str(n_iter) + "_" + str(idx) +"_agent_left.gif", image_obs_left)
                 
             idx += 1
             
@@ -280,15 +276,17 @@ class ConcurrentCollector():
             success_push_2 = max(success_push_2, success_2)
             
             # must do the job sequentially
-            if (success_2==1 and success_1==1) or (success_2==0 and success_1==0):
-                success_flag = False
-            
+            if (success_2 == 1 and success_1 == 0):
+                success_flag_2 = True
+            elif(success_2 == 0 and success_1 == 1):
+                success_flag_1 = True
+                
             log_info += "agent_success_push_1: " + str(success_1) + "\n"
             log_info += "agent_success_push_2: " + str(success_2) + "\n"
             log_info += "agent_push_1: " +  str(dist_1) + "\n"
             log_info += "agent_push_2: " + str(dist_2) + "\n"
             log_info += "path_length: " + str(len(acs)) + "\n"  
-            log_info += "success_flag: " + str(success_flag) + "\n"
+            log_info += "success: " + str(success_flag_1 and success_flag_2) + "\n"
         
         if log == True:
             print(log_info)
@@ -296,7 +294,7 @@ class ConcurrentCollector():
         success_dict={
             "push_1": success_push_1,
             "push_2": success_push_2,
-            "success": success_flag
+            "success": success_flag_1 and success_flag_2
         }
         return success_dict
     

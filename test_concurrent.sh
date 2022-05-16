@@ -22,7 +22,7 @@ python starter/EM.py \
     --n_iter 50 \
     --eval_interval 1 \
     --learning_rate 1e-4 \
-    --ep_len 800 \
+    --ep_len 400 \
     --batch_size 64 \
     --train_batch_size 32 \
     --config config/concurrent.json \
@@ -35,4 +35,4 @@ python starter/EM.py \
     --expert_num 3 \
     --no_cuda \
     --test true \
-    --load_from_checkpoint ./fig/EM_model.pth
+    --load_from_checkpoint ./fig/EM_success_model.pth
