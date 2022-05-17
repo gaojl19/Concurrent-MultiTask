@@ -193,8 +193,9 @@ class ConcurrentCollector():
         # initialize env for the beginning of a new rollout
         success_push_1 = 0
         success_push_2 = 0
-        push_dist1 = 1
-        push_dist2 = 1
+        push_1 = 0.22360679774997905
+        push_2 = 0.31622776601683794
+
         success_flag_1 = False
         success_flag_2 = False
         
@@ -276,9 +277,9 @@ class ConcurrentCollector():
             success_push_2 = max(success_push_2, success_2)
             
             # must do the job sequentially
-            if (success_2 == 1 and success_1 == 0):
+            if (success_2 == 1 and success_1 == 0 and abs(dist_1-push_1)<0.01):
                 success_flag_2 = True
-            elif(success_2 == 0 and success_1 == 1):
+            elif(success_2 == 0 and success_1 == 1 and abs(dist_2-push_2)<0.01):
                 success_flag_1 = True
                 
             log_info += "agent_success_push_1: " + str(success_1) + "\n"

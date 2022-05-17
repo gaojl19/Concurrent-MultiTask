@@ -32,17 +32,13 @@ def convert_listofrollouts(paths, embedding_flag=False, index_flag=False):
 
     observations = np.concatenate([path["observation"] for path in paths])
     actions = np.concatenate([path["action"] for path in paths])
-    print(paths)
-    print(index_flag, embedding_flag)
+
     if embedding_flag:
         embedding_input= np.concatenate([path["embedding_input"] for path in paths])
         return observations, actions, embedding_input
 
     elif index_flag:
-        print("here")
-        print([path["index_input"] for path in paths])
         index_input = np.concatenate([path["index_input"] for path in paths])
-        print(index_input)
         return observations, actions, index_input
     
     # single task doesn't need task embedding

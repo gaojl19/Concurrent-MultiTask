@@ -153,7 +153,7 @@ class ReplayBuffer(object):
             self.acs = np.concatenate([self.acs, actions])[-self.max_size:]
             self.index_input = np.concatenate([self.index_input, index_input])[-self.max_size:]
             
-        print(self.index_input)
+        # print(self.index_input)
             
             
     def sample_random_data_embedding(self, batch_size):

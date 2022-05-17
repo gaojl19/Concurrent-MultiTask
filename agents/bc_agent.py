@@ -5,6 +5,7 @@ from policy.Soft_Module_policy import SoftModulePolicy
 from policy.MultiHead_policy import MultiHeadPolicy
 from policy.EM_policy import EMMultiHeadPolicy
 from policy.IQ_learn_policy import *
+from policy.VAE_policy import *
 from policy.Disentanglement_policy import DisentanglementPolicy, DisentangleMultiHeadPolicy
 from .base_agent import BaseAgent
 import torch.nn as nn
@@ -401,6 +402,72 @@ class EMMultiHeadAgent(BaseAgent):
 
         # replay buffer
         self.replay_buffer = ReplayBuffer(self.agent_params['max_replay_buffer_size'])
+
+    def train(self, ob_no, ac_na, idx, log=False):
+        self.actor.policy.train()
+        
+        self.optimizer.zero_grad()
+        loss= self.actor.train_forward(ob_no, ac_na, idx, self.loss, log)
+
+        loss.backward()
+        
+        # for x in self.actor.policy.parameters():
+        #     print(x.grad)
+        
+        self.optimizer.step()
+        
+        log = {
+            # You can add extra logging information here, but keep this line
+            'Training Loss': loss.to('cpu').detach().numpy(),
+        } 
+        return log
+    
+    def add_to_replay_buffer(self, paths):
+        self.replay_buffer.add_index_rollouts(paths)
+
+    def sample(self, batch_size, complete=False):
+        '''
+            in order for EM algorithms to converge, it must be fitted with the complete dataset
+        '''
+        return self.replay_buffer.sample_random_data_index(batch_size, complete=complete) 
+    
+    def mt_sample(self, batch_size):
+        return self.replay_buffer.sample_random_data_index(batch_size)
+
+    def save(self, path):
+        return self.actor.save(path)  
+
+
+class VAEMultiHeadAgent(BaseAgent):
+    def __init__(self, env, agent_params, params):
+        super(VAEMultiHeadAgent, self).__init__()
+
+        # init vars
+        self.env = env
+        self.agent_params = agent_params
+
+        # actor/policy
+        self.actor = VAEMultiHeadPolicy(
+            input_shape = self.agent_params['ob_dim'],
+            output_shape = self.agent_params['ac_dim'],
+            head_num = self.agent_params["head_num"],
+            hidden_shape = self.agent_params['size'],
+            params = params
+        )
+        
+        print("actor: \n", self.actor.policy)
+        
+        # update
+        self.loss = nn.MSELoss(reduce=False)
+        self.learning_rate = self.agent_params['learning_rate']
+        self.optimizer = optim.Adam(
+            self.actor.parameters(),
+            lr=self.learning_rate,
+        )
+
+        # replay buffer
+        self.replay_buffer = ReplayBuffer(self.agent_params['max_replay_buffer_size'])
+
 
     def train(self, ob_no, ac_na, idx, log=False):
         self.actor.policy.train()
