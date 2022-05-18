@@ -69,6 +69,7 @@ class BC_Trainer(object):
         self.args['agent_params']['ac_dim'] = ac_dim
         self.args['agent_params']['ob_dim'] = ob_dim
         self.args['agent_params']['head_num'] = TASK_NUM + 1
+        self.args['agent_params']['soft'] = self.args["soft"]
         agent = VAEMultiHeadAgent(self.env, self.args['agent_params'], self.params)
 
         if args["load_from_checkpoint"]:
@@ -131,6 +132,8 @@ def main():
     parser.add_argument("--load_from_checkpoint", type=str, default=None)
     parser.add_argument("--interface", type=bool, default=False)
     parser.add_argument("--train_full_data", type=bool, default=False)
+    parser.add_argument("--soft", type=bool, default=False)
+    
     
     
     # training settings

@@ -54,7 +54,7 @@ class Encoder(nn.Module):
         return out
     
 class VAEMultiHeadPolicy(nn.Module):
-    def __init__(self, input_shape, output_shape, hidden_shape, head_num, params):
+    def __init__(self, input_shape, output_shape, hidden_shape, head_num, params, soft):
         super().__init__()
         
         self.encoder = Encoder(
@@ -74,6 +74,7 @@ class VAEMultiHeadPolicy(nn.Module):
         self.input_shape = input_shape
         self.head_num = head_num
         self.last_weights = torch.Tensor()
+        self.soft = soft
         # print(env.observation_space.shape[0])
     
     
@@ -84,39 +85,57 @@ class VAEMultiHeadPolicy(nn.Module):
         '''
         
         # 1. calculate latent variable z(weights)
-        weights = self.encoder(obs,acs)
-        if log:
-            print("weights: ", weights)
-        
-        
-        # 2. calculate different loss
-        mean_list, std_list, log_std_list = self.policy.train_forward(obs)
-        loss = []
-        for i in range(len(mean_list)):
-            mean = mean_list[i]
-            std = std_list[i]
+        if self.soft:
+            weights = self.encoder(obs,acs)
             
-            dis = TanhNormal(mean, std)
-            action = dis.rsample( return_pretanh_value = False)
-            loss.append(criterion(action, acs).sum(dim=1)/acs.shape[1])  
-        
-        # 3. average loss over weights
-        loss = torch.stack(loss).reshape(weights.shape)
-        # print(loss.shape, weights.shape)
-        loss = loss*weights
-        
-        loss = loss.sum(dim=1) # average over multi-heads
-        loss = loss.sum(dim=0)/loss.shape[0] # average over batch samples
-        
-        # print weights differences
-        if log:
-            if self.last_weights.shape == weights.shape:
-                print("weights difference with last: ", abs(self.last_weights-weights).sum(dim=1), abs(self.last_weights-weights).sum(dim=1).sum(dim=0))
-            weight_idx = weights.argmax(dim=1)
-            idx = idx.reshape(weight_idx.shape)
+            if log:
+                print("weights: ", weights)
+            
+            # 2. calculate different loss
+            mean_list, std_list, log_std_list = self.policy.train_forward(obs)
+            loss = []
+            for i in range(len(mean_list)):
+                mean = mean_list[i]
+                std = std_list[i]
+                
+                dis = TanhNormal(mean, std)
+                action = dis.rsample( return_pretanh_value = False)
+                loss.append(criterion(action, acs).sum(dim=1)/acs.shape[1])  
+            
+            # 3. average loss over weights
+            loss = torch.stack(loss).reshape(weights.shape)
+            # print(loss.shape, weights.shape)
+            loss = loss*weights
+            
+            loss = loss.sum(dim=1) # average over multi-heads
+            loss = loss.sum(dim=0)/loss.shape[0] # average over batch samples
+            
+            # print weights differences
+            if log:
+                if self.last_weights.shape == weights.shape:
+                    print("weights difference with last: ", abs(self.last_weights-weights).sum(dim=1), abs(self.last_weights-weights).sum(dim=1).sum(dim=0))
+                weight_idx = weights.argmax(dim=1)
+                idx = idx.reshape(weight_idx.shape)
 
-            print("weights differences with truth: ", abs(weight_idx-idx), abs(weight_idx-idx).sum(dim=0))
-        self.last_weights = weights
+                print("weights differences with truth: ", abs(weight_idx-idx), abs(weight_idx-idx).sum(dim=0))
+            self.last_weights = weights
+        
+        
+        ## Hard update
+        else:
+            weights = self.encoder(obs,acs)
+            # print(weights)
+    
+            idx = weights.argmax(dim=1, keepdim=True)
+            if log:
+                print(idx.reshape(1,-1))
+            
+            mean, std, log_std = self.policy.forward(obs, idx)
+            dis = TanhNormal(mean, std)
+            action = dis.rsample( return_pretanh_value = False )
+        
+            loss = criterion(action, acs)
+        
         return loss
 
     

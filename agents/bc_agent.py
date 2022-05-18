@@ -452,13 +452,18 @@ class VAEMultiHeadAgent(BaseAgent):
             output_shape = self.agent_params['ac_dim'],
             head_num = self.agent_params["head_num"],
             hidden_shape = self.agent_params['size'],
-            params = params
+            params = params,
+            soft = self.agent_params["soft"]
         )
         
         print("actor: \n", self.actor.policy)
         
         # update
-        self.loss = nn.MSELoss(reduce=False)
+        if self.agent_params["soft"]:
+            self.loss = nn.MSELoss(reduce=False)
+        else:
+            self.loss = nn.MSELoss()
+            
         self.learning_rate = self.agent_params['learning_rate']
         self.optimizer = optim.Adam(
             self.actor.parameters(),
