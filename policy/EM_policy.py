@@ -107,7 +107,7 @@ class EMMultiHeadPolicy(nn.Module):
     def eval_act(self, obs: np.ndarray, idx):
         with torch.no_grad():
             mean, std, log_std = self.policy.forward(obs, idx)
-        return mean.squeeze(0).detach().cpu().numpy()
+        return torch.tanh(mean.squeeze(0)).detach().cpu().numpy()
     
     def get_action(self, obs: np.ndarray, idx):
         # if len(obs.shape) > 1:
@@ -117,5 +117,6 @@ class EMMultiHeadPolicy(nn.Module):
 
         # # TODO return the action that the policy prescribes
         # return self.forward(observation, idx)
+    
         return self.eval_act(obs, idx)
 

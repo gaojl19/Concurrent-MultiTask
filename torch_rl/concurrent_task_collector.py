@@ -190,6 +190,7 @@ class ConcurrentCollector():
     
     def run_agent(self, policy, render=False, log = False, log_prefix = "./", n_iter=0, use_index=False):
         
+        policy.eval()
         # initialize env for the beginning of a new rollout
         success_push_1 = 0
         success_push_2 = 0
@@ -215,6 +216,7 @@ class ConcurrentCollector():
             print("idx: ", idx)
                 
             log_info += "initial ob: " + str(ob) + "\n"
+            # print("initial obs: ", ob)
             
             # init vars
             obs, acs, rewards, next_obs, terminals, image_obs_front, image_obs_left, embedding_input, index_input = [], [], [], [], [], [], [], [], []
@@ -236,6 +238,9 @@ class ConcurrentCollector():
                 # log_info += "agent:" + str(act) + "\n"
                     
                 acs.append(act)
+                print("agent: ", act)
+                # print("obs: ", ob)
+                
                 
                 # take that action and record results
                 ob, r, done, info = env.step(act)
@@ -265,7 +270,6 @@ class ConcurrentCollector():
                 if rollout_done:
                     break
             
-                
             if len(image_obs_front)>0:
                 imageio.mimsave(log_prefix + str(n_iter) + "_" + str(idx)+ "_agent_front.gif", image_obs_front)
             if len(image_obs_left)>0:

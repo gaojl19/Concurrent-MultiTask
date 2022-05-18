@@ -4,6 +4,7 @@ import torch
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import random
 import gym
 
 import sys
@@ -11,7 +12,6 @@ sys.path.append(".")
 
 from torch_rl.rl_trainer import RL_Trainer
 from agents.bc_agent import EMMultiHeadAgent
-from policy.loaded_gaussian_policy import LoadedGaussianPolicy
 from metaworld_utils.concurrent_sawyer import ConcurrentSawyerEnv
 from metaworld_utils import SEPARATE_CONCURRENT
 from utils.args import get_params
@@ -42,6 +42,8 @@ class BC_Trainer(object):
         np.random.seed(args["seed"])
         if args["cuda"]:
             torch.backends.cudnn.deterministic=True
+        torch.set_printoptions(precision=10)
+        random.seed(args["seed"])
 
     
         self.params['general_setting']['env'] = self.env
@@ -72,8 +74,8 @@ class BC_Trainer(object):
         agent = EMMultiHeadAgent(self.env, self.args['agent_params'], self.params)
 
         if args["load_from_checkpoint"]:
-            agent.actor.policy.load_state_dict(torch.load(args["load_from_checkpoint"], map_location='cpu'))
-        
+            agent.actor.policy.load_state_dict(torch.load(args["load_from_checkpoint"], map_location='cpu'), strict=True)
+                
         # EXPERT file path
         # TAG = args["expert_index"]
         # if args["task_type"] == "push_1":

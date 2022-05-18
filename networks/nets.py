@@ -57,13 +57,19 @@ class Net(nn.Module):
         net_last_init_func(self.last)
 
     def forward(self, x):
+        # for p in self.base.parameters():
+        #     print(p)
         out = self.base(x)
+        # print("out1: ", out)
 
         for append_fc in self.append_fcs:
             out = append_fc(out)
+            # print(out)
             out = self.activation_func(out)
+            # print(out)
 
         out = self.last(out)
+        # print(out)
         return out
 
 
@@ -398,6 +404,7 @@ class BootstrappedNet(Net):
 
     # TODO: understand this part!
     def forward(self, x, idx):
+        
         base_shape = x.shape[:-1]
         # print("base shape: ", base_shape) # [batch_size, 1]
         out = super().forward(x)
