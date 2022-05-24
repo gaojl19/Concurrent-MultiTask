@@ -11,7 +11,6 @@ sys.path.append(".")
 
 from torch_rl.rl_trainer import RL_Trainer
 from agents.bc_agent import MultiHeadAgent
-from policy.loaded_gaussian_policy import LoadedGaussianPolicy
 from metaworld_utils.concurrent_sawyer import ConcurrentSawyerEnv
 from metaworld_utils import SEPARATE_CONCURRENT
 from utils.args import get_params
@@ -115,9 +114,10 @@ class BC_Trainer(object):
                 n_iter=self.args['n_iter']
             )
     
-    def run_test(self):
+    def run_test(self, action_file=None):
+        
         self.rl_trainer.agent.actor.eval()
-        self.rl_trainer.test_agent()
+        self.rl_trainer.test_agent(action_file=action_file)
    
 def main():
     import argparse
@@ -130,6 +130,7 @@ def main():
     parser.add_argument("--load_from_checkpoint", type=str, default=None)
     parser.add_argument("--interface", type=bool, default=False)
     parser.add_argument("--train_full_data", type=bool, default=False)
+    parser.add_argument("--load_action_path", type=str, default="./")
     
     
     # training settings
@@ -182,7 +183,7 @@ def main():
     # RUN TRAINING
     trainer = BC_Trainer(args, params)
     if args["test"]:
-        trainer.run_test()
+        trainer.run_test(action_file=args["load_action_path"])
     else:
         if args["multiple_runs"]:
             trainer.run_multiple_training_loop()

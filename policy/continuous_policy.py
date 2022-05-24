@@ -445,3 +445,62 @@ class MultiHeadGuassianContPolicy(networks.BootstrappedNet):
 
         dic["action"] = action.squeeze(0)
         return dic
+    
+
+class SingleHeadContPolicy(nn.Module):
+    def __init__(self, input_shape, output_shape, hidden_shape, n_layers, activation_func=F.relu, init_func = init.basic_init, last_activation_func = None ):
+        super().__init__()
+        
+        self.activation_func = activation_func
+        self.fcs = []
+        if last_activation_func is not None:
+            self.last_activation_func = last_activation_func
+        else:
+            self.last_activation_func = None
+        input_shape = np.prod(input_shape)
+        self.input_shape = input_shape
+        self.output_shape = output_shape
+        
+        for i in range(n_layers):
+            fc = nn.Linear(input_shape, hidden_shape)
+            input_shape = hidden_shape
+            init_func(fc)
+            self.fcs.append(fc)
+            # set attr for pytorch to track parameters( device )
+            self.__setattr__("fc{}".format(i), fc)
+        
+        
+        # last layer: output mean and variance
+        fc = nn.Linear(hidden_shape, output_shape)
+        init_func(fc)
+        self.fcs.append(fc)
+        self.__setattr__("fc{}".format(i), fc)
+        
+        
+    def forward(self, x):
+        out = x
+        for fc in self.fcs[:-1]:
+            out = fc(out)
+            out = self.activation_func(out)
+        out = self.fcs[-1](out)
+        
+        if self.last_activation_func != None:
+            out = self.last_activation_func(out)
+        
+        mean, log_std = out.chunk(2, dim=-1)
+        # make sure that min <= log_std <= max
+        log_std = torch.clamp(log_std, LOG_SIG_MIN, LOG_SIG_MAX)
+        
+        # calculate standard deviation
+        std = torch.exp(log_std)
+        
+        return mean, std, log_std
+        
+
+    def eval_act( self, x ):
+        with torch.no_grad():
+            mean, _, _ = self.forward(x)
+        return torch.tanh(mean.squeeze(0)).detach().cpu().numpy()
+
+    def get_action(self, x):
+        return self.eval_act(x)

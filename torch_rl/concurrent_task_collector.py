@@ -15,7 +15,7 @@ from metaworld_utils.meta_env import generate_single_mt_env
 
 
 class ConcurrentCollector():
-    def __init__(self, env, env_cls, env_args, env_info, device, max_path_length, min_timesteps_per_batch, input_shape, task_types, embedding_input = [], index_input = None):
+    def __init__(self, env, env_cls, env_args, env_info, device, max_path_length, min_timesteps_per_batch, input_shape, task_types, seed=0, embedding_input = [], index_input = None):
         self.env = copy.deepcopy(env)
         self.env_cls = copy.deepcopy(env_cls)
         self.env_args = copy.deepcopy(env_args)
@@ -27,6 +27,7 @@ class ConcurrentCollector():
         self.index_input = index_input
         self.input_shape = input_shape
         self.task_types = task_types
+        self.seed = seed
         
         self.env_info.env_cls = generate_single_mt_env
         tasks = list(self.env_cls.keys())
@@ -66,6 +67,7 @@ class ConcurrentCollector():
         # initialize env for the beginning of a new rollout
         env = self.env_info.env
         env.eval()
+    
         if self.task_types == ["push-2"]:
             ob = env.reset(push_2_init=True)
         else:
@@ -188,6 +190,107 @@ class ConcurrentCollector():
         return paths, timesteps_this_batch
     
     
+    def run_agent_json(self, json_file, render, log_prefix):
+        
+        # initialize env for the beginning of a new rollout
+        success_push_1 = 0
+        success_push_2 = 0
+        push_1 = 0.22360679774997905
+        push_2 = 0.31622776601683794
+
+        success_flag_1 = False
+        success_flag_2 = False
+        
+        log_info = ""
+        idx = 0
+        
+        # read json file, to get action 
+        with open(json_file, "r") as fin:
+            action_list = json.load(fin)["actions"]
+        fin.close()
+        
+        # test push-1 and push-2 sequentially
+        # if only push-1/push-2, test 1
+        for acs in action_list:
+            success_1 = 0
+            success_2 = 0
+            dist_1 = 1
+            dist_2 = 1
+            
+            image_obs_front, image_obs_left = [], []
+            
+            env = self.env_info.env
+            env.eval()
+            ob = env.reset()
+            env.seed(0)
+                
+            log_info += "initial ob: " + str(ob) + "\n"
+            print("initial obs: ", ob)
+            
+            steps = 0
+            done = False
+            
+            for act in acs:
+                ob, r, done, info = env.step(np.array(act))
+                print(np.array(act))
+                print(ob)
+                exit(0)
+                
+                
+                # record result of taking that action
+                steps += 1
+                
+                # only support rbg_array mode currently
+                if render:
+                    image = env.get_image(400,400,'leftview')
+                    image_obs_left.append(image)
+                    image = env.get_image(400,400,'frontview')
+                    image_obs_front.append(image)
+                
+                success_1 = max(success_1, info["success_push_1"])
+                success_2 = max(success_2, info["success_push_2"])
+                dist_1 = min(dist_1, info["pushDist1"])
+                dist_2 = min(dist_2, info["pushDist2"])
+
+                # end the rollout if the rollout ended
+                rollout_done = True if (done or steps>=self.max_path_length) else False
+
+                if rollout_done:
+                    break
+            
+            if len(image_obs_front)>0:
+                imageio.mimsave(log_prefix + "test_" + str(idx)+ "_agent_front.gif", image_obs_front)
+            if len(image_obs_left)>0:
+                imageio.mimsave(log_prefix + "test_" + str(idx) +"_agent_left.gif", image_obs_left)
+                
+            idx += 1
+            
+            success_push_1 = max(success_push_1, success_1)
+            success_push_2 = max(success_push_2, success_2)
+            
+            # must do the job sequentially
+            if (success_2 == 1 and success_1 == 0 and abs(dist_1-push_1)<0.01):
+                success_flag_2 = True
+            elif(success_2 == 0 and success_1 == 1 and abs(dist_2-push_2)<0.01):
+                success_flag_1 = True
+                
+            log_info += "agent_success_push_1: " + str(success_1) + "\n"
+            log_info += "agent_success_push_2: " + str(success_2) + "\n"
+            log_info += "agent_push_1: " +  str(dist_1) + "\n"
+            log_info += "agent_push_2: " + str(dist_2) + "\n"
+            log_info += "path_length: " + str(len(acs)) + "\n"  
+            log_info += "success: " + str(success_flag_1 and success_flag_2) + "\n"
+
+            
+        print(log_info)
+        
+        success_dict={
+            "push_1": success_push_1,
+            "push_2": success_push_2,
+            "success": success_flag_1 and success_flag_2
+        }
+        return success_dict
+        
     def run_agent(self, policy, render=False, log = False, log_prefix = "./", n_iter=0, use_index=False):
         
         policy.eval()
@@ -212,6 +315,7 @@ class ConcurrentCollector():
             
             env = self.env_info.env
             env.eval()
+            env.seed(0)
             ob = env.reset()
             print("idx: ", idx)
                 
@@ -238,9 +342,9 @@ class ConcurrentCollector():
                 # log_info += "agent:" + str(act) + "\n"
                     
                 acs.append(act)
-                print("agent: ", act)
+                # print(act)
                 # print("obs: ", ob)
-                
+                               
                 
                 # take that action and record results
                 ob, r, done, info = env.step(act)
@@ -276,7 +380,7 @@ class ConcurrentCollector():
                 imageio.mimsave(log_prefix + str(n_iter) + "_" + str(idx) +"_agent_left.gif", image_obs_left)
                 
             idx += 1
-            
+
             success_push_1 = max(success_push_1, success_1)
             success_push_2 = max(success_push_2, success_2)
             
@@ -410,6 +514,7 @@ class ConcurrentCollector():
         # print(act)
         return np.array(act)
         
+        
     def start_human_demo(self, stdscr, env, prefix):
         
         interface_acs = []
@@ -505,6 +610,7 @@ class ConcurrentCollector():
         # initialize env for the beginning of a new rollout
         env = self.env_info.env
         env.eval()
+        env.seed(0)
         ob = env.reset()
         # ob = np.concatenate((ob[:6], ob[9:12]))
         ob = np.concatenate((ob[:6], ob[9:12]))

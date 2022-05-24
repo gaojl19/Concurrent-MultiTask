@@ -12,7 +12,6 @@ sys.path.append(".")
 
 from torch_rl.rl_trainer import RL_Trainer
 from agents.bc_agent import MultiHeadAgent
-from policy.loaded_gaussian_policy import LoadedGaussianPolicy
 from metaworld_utils.concurrent_sawyer import ConcurrentSawyerEnv
 from metaworld_utils import SEPARATE_CONCURRENT
 from utils.args import get_params

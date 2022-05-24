@@ -125,8 +125,10 @@ class VAEMultiHeadPolicy(nn.Module):
         else:
             weights = self.encoder(obs,acs)
             # print(weights)
-    
-            idx = weights.argmax(dim=1, keepdim=True)
+            print(weights.shape)
+            idx = torch.multinomial(weights, 1)
+            print(idx.shape)
+            # idx = weights.argmax(dim=1, keepdim=True)
             if log:
                 print(idx.reshape(1,-1))
             
@@ -135,7 +137,7 @@ class VAEMultiHeadPolicy(nn.Module):
             action = dis.rsample( return_pretanh_value = False )
         
             loss = criterion(action, acs)
-        
+            
         return loss
 
     

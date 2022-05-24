@@ -204,12 +204,13 @@ class MultiHeadAgent(BaseAgent):
  
 
 class EMMultiHeadAgent(BaseAgent):
-    def __init__(self, env, agent_params, params):
+    def __init__(self, env, agent_params, params, use_log_prob):
         super(EMMultiHeadAgent, self).__init__()
 
         # init vars
         self.env = env
         self.agent_params = agent_params
+        self.use_log_prob = use_log_prob
 
         # actor/policy
         self.actor = EMMultiHeadPolicy(
@@ -236,7 +237,7 @@ class EMMultiHeadAgent(BaseAgent):
         self.actor.policy.train()
         
         self.optimizer.zero_grad()
-        loss= self.actor.train_forward(ob_no, ac_na, idx, self.loss, log)
+        loss= self.actor.train_forward(ob_no, ac_na, idx, self.loss, log, use_log_prob=self.use_log_prob)
 
         loss.backward()
         

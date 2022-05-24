@@ -84,7 +84,7 @@ class ConcurrentSawyerEnv(SawyerXYZEnv):
         if goal_high is None:
             goal_high = self.hand_high
 
-        self.random_init = random_init
+        # self.random_init = random_init
         self.liftThresh = liftThresh
         self.max_path_length = 1000
         self.rewMode = rewMode

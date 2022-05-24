@@ -11,7 +11,6 @@ sys.path.append(".")
 
 from torch_rl.rl_trainer import RL_Trainer
 from agents.bc_agent import VAEMultiHeadAgent
-from policy.loaded_gaussian_policy import LoadedGaussianPolicy
 from metaworld_utils.concurrent_sawyer import ConcurrentSawyerEnv
 from metaworld_utils import SEPARATE_CONCURRENT
 from utils.args import get_params
@@ -87,7 +86,11 @@ class BC_Trainer(object):
 
         
         # LOG PREFIX
-        log_prefix = "./fig/VAE_baseline/"
+        if args["soft"]:
+            log_prefix = "./fig/VAE_soft_baseline/" + str(args["seed"]) + "/"
+        else:
+            log_prefix = "./fig/VAE_hard_baseline/" + str(args["seed"]) + "/"
+            
     
         # RL TRAINER
         self.rl_trainer = RL_Trainer(env = self.env, 

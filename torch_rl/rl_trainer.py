@@ -1,3 +1,4 @@
+import json
 from utils.utils import *
 from metaworld_utils.meta_env import generate_single_mt_env
 from torch_rl.replay_buffer import EnvInfo
@@ -224,11 +225,14 @@ class RL_Trainer(object):
             
         return all_logs
             
-    def test_agent(self):
+    def test_agent(self, action_file=None):
         # TEST
         print("\n\n-------------------------------- Test Results -------------------------------- ")
         render = True
-        success_dict = self.expert_env.run_agent(policy=self.agent.actor, render=render, log=True, log_prefix = self.plot_prefix, n_iter="test", use_index=self.test_idx_flag)
+        if action_file:
+            success_dict = self.expert_env.run_agent_json(json_file=action_file, render=render, log_prefix = self.plot_prefix)
+        else:
+            success_dict = self.expert_env.run_agent(policy=self.agent.actor, render=render, log=True, log_prefix = self.plot_prefix, n_iter="test", use_index=self.test_idx_flag)
     
         return success_dict
             
