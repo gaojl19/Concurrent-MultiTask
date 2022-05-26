@@ -193,7 +193,6 @@ class MultiHeadAgent(BaseAgent):
         self.replay_buffer.add_rollouts(paths)
 
     def sample(self, batch_size, complete=False):
-        print("complete: ", complete)
         return self.replay_buffer.sample_random_data(batch_size, complete=complete) 
     
     def mt_sample(self, batch_size):
@@ -267,6 +266,7 @@ class EMMultiHeadAgent(BaseAgent):
 
     def save(self, path):
         return self.actor.save(path)  
+
 
 
 class VAEMultiHeadAgent(BaseAgent):

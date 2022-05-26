@@ -72,14 +72,15 @@ class EMMultiHeadPolicy(nn.Module):
             weights = weights/weights.sum(dim=0)
             if log:
                 print("weights: ", weights.argmax(dim=0))
-                print("log prob: ", log_prob)
+                # print("log prob: ", log_prob)
             
             # print("weights: ", weights.shape)
             # print("log prob:", log_prob.shape)
             
-            loss = 1/(log_prob * weights).mean()
-            loss = torch.exp(loss)
-            exit(0)
+            loss = (log_prob * weights).mean()
+            loss = 1/torch.exp(loss)
+            # print(loss)
+            
             
 
         else:

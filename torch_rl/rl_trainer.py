@@ -78,19 +78,20 @@ class RL_Trainer(object):
         else:
             for i in range(self.expert_num):
                 TAG = str(i+1)
-                if self.mt_flag == False:
-                    if self.args["task_types"] == "push-1":   # concurrent learning both push-1 and push-2
-                        # expert_file_path = ["../Expert/Concurrent/" + TAG + "/push_1.json", "../Expert/Concurrent/" + TAG + "/push_3.json"]
-                        expert_file_path = ["./Expert/HandCollect/" + TAG + "/expert_demo_1.json", "./Expert/HandCollect/" + TAG + "/expert_demo_5.json"]
-                    elif self.args["task_types"] == "push-2":
-                        # expert_file_path = ["../Expert/Concurrent/" + TAG + "/push_2.json"]
-                        expert_file_path = ["./Expert/HandCollect/" + TAG + "/expert_demo_3.json"]
-                    else:
-                        raise NotImplementedError("Invalid task_type!" + self.args["task_types"])
-                else:
-                    # expert_file_path = ["../Expert/Concurrent/" + TAG + "/push_1.json", "../Expert/Concurrent/"+ TAG + "/1.json", "../Expert/Concurrent/" + TAG + "/push_2.json", "../Expert/Concurrent/"+ TAG + "/2.json", "../Expert/Concurrent/" + TAG + "/push_3.json"]
-                    expert_file_path = ["./Expert/HandCollect/" + TAG + "/expert_demo_1.json",  "./Expert/HandCollect/" + TAG + "/expert_demo_2.json", "./Expert/HandCollect/" + TAG + "/expert_demo_3.json", "./Expert/HandCollect/" + TAG + "/expert_demo_4.json", "./Expert/HandCollect/" + TAG + "/expert_demo_5.json"]
-                training_returns = self.expert_env.sample_expert(action_file=expert_file_path, render=True, log=True, plot_prefix = self.plot_prefix, tag = TAG)
+                # if self.mt_flag == False:
+                #     if self.args["task_types"] == "push-1":   # concurrent learning both push-1 and push-2
+                #         # expert_file_path = ["../Expert/Concurrent/" + TAG + "/push_1.json", "../Expert/Concurrent/" + TAG + "/push_3.json"]
+                #         expert_file_path = ["./Expert/HandCollect/" + TAG + "/expert_demo_1.json", "./Expert/HandCollect/" + TAG + "/expert_demo_5.json"]
+                #     elif self.args["task_types"] == "push-2":
+                #         # expert_file_path = ["../Expert/Concurrent/" + TAG + "/push_2.json"]
+                #         expert_file_path = ["./Expert/HandCollect/" + TAG + "/expert_demo_3.json"]
+                #     else:
+                #         raise NotImplementedError("Invalid task_type!" + self.args["task_types"])
+                # else:
+                #     # expert_file_path = ["../Expert/Concurrent/" + TAG + "/push_1.json", "../Expert/Concurrent/"+ TAG + "/1.json", "../Expert/Concurrent/" + TAG + "/push_2.json", "../Expert/Concurrent/"+ TAG + "/2.json", "../Expert/Concurrent/" + TAG + "/push_3.json"]
+                
+                expert_file_path = ["./Expert/HandCollect/" + TAG + "/expert_demo_1.json",  "./Expert/HandCollect/" + TAG + "/expert_demo_2.json", "./Expert/HandCollect/" + TAG + "/expert_demo_3.json", "./Expert/HandCollect/" + TAG + "/expert_demo_4.json", "./Expert/HandCollect/" + TAG + "/expert_demo_5.json"]
+                training_returns = self.expert_env.read_expert(demo_file=expert_file_path, mt_flag=self.mt_flag, task_type=self.args["task_types"])
             
                 paths, envsteps_this_batch= training_returns
                 self.total_envsteps += envsteps_this_batch

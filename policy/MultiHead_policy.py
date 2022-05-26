@@ -28,7 +28,6 @@ class MultiHeadPolicy(nn.Module):
             for i in range(obs.shape[0]):
                 idx.append(np.array(random.sample(range(self.head_num), 1)))
             idx = torch.LongTensor(idx).reshape(-1, 1)
-            print(idx)
             
         mean, std, log_std = self.policy.forward(obs, idx)
         dis = TanhNormal(mean, std)

@@ -1,4 +1,5 @@
 from curses import KEY_BACKSPACE
+from mimetypes import init
 from operator import index
 from os import lockf
 from re import L
@@ -15,7 +16,7 @@ from metaworld_utils.meta_env import generate_single_mt_env
 
 
 class ConcurrentCollector():
-    def __init__(self, env, env_cls, env_args, env_info, device, max_path_length, min_timesteps_per_batch, input_shape, task_types, seed=0, embedding_input = [], index_input = None):
+    def __init__(self, env, env_cls, env_args, env_info, device, max_path_length, min_timesteps_per_batch, input_shape, task_types, seed=0, embedding_input = [], index_input = None, eval_episode=3):
         self.env = copy.deepcopy(env)
         self.env_cls = copy.deepcopy(env_cls)
         self.env_args = copy.deepcopy(env_args)
@@ -28,6 +29,7 @@ class ConcurrentCollector():
         self.input_shape = input_shape
         self.task_types = task_types
         self.seed = seed
+        self.eval_episode = eval_episode
         
         self.env_info.env_cls = generate_single_mt_env
         tasks = list(self.env_cls.keys())
@@ -57,6 +59,52 @@ class ConcurrentCollector():
         self.env_info.env.eval()
 
     
+    def read_expert(self, demo_file, mt_flag, task_type):  
+        
+        # init vars
+        obs, acs, next_obs, terminals, success, embedding_input, index_input = [], [], [], [], [], [], []
+        
+        # read all the actions
+        import json
+        action_list = []
+        obs_list = []
+        
+        # do separate steps
+        for file in demo_file:
+            
+            with open(file, 'r') as fin:
+                json_file = json.load(fin)
+                ac = json_file["actions"]
+                ob = json_file["observations"]
+                idx_truth = json_file["idx"]
+                
+                if mt_flag:
+                    action_list.append(ac)
+                    obs_list.append(ob)
+                else:
+                    if task_type == "push-1" and idx_truth == 0:
+                        action_list.append(ac)
+                        obs_list.append(ob)
+                    elif task_type == "push-2" and idx_truth == 1:
+                        action_list.append(ac)
+                        obs_list.append(ob)
+                
+                print("file, idx truth: ", file, idx_truth)  
+            fin.close()
+        
+            for i in range(len(ac)):
+                # print(torch.LongTensor([idx_truth]))
+                index_input.append(torch.LongTensor([idx_truth]))
+                obs.append(np.array(ob[i][:self.input_shape]))
+                acs.append(np.array(ac[i]))
+            
+        paths = [Path(obs, acs, next_obs, terminals, success, embedding_input, index_input)]
+        
+        timesteps_this_batch = 0
+        for p in paths:
+            timesteps_this_batch += len(p["observation"])
+
+        return paths, timesteps_this_batch
     
     # the policy gradient should be frozen before sending into this function
     def sample_expert(self, action_file, render=True, log=True, plot_prefix=None, tag=None):  
@@ -290,113 +338,119 @@ class ConcurrentCollector():
             "success": success_flag_1 and success_flag_2
         }
         return success_dict
+      
+      
         
     def run_agent(self, policy, render=False, log = False, log_prefix = "./", n_iter=0, use_index=False):
         
         policy.eval()
         # initialize env for the beginning of a new rollout
-        success_push_1 = 0
-        success_push_2 = 0
-        push_1 = 0.22360679774997905
-        push_2 = 0.31622776601683794
+        success_push_1, success_push_2 = 0, 0
 
-        success_flag_1 = False
-        success_flag_2 = False
+        success_flag_1, success_flag_2 = False, False
         
         log_info = ""
         
         # test push-1 and push-2 sequentially
         # if only push-1/push-2, test 1
-        for idx in range(len(self.task_types)+1):
-            success_1 = 0
-            success_2 = 0
-            dist_1 = 1
-            dist_2 = 1
-            
-            env = self.env_info.env
-            env.eval()
-            env.seed(0)
-            ob = env.reset()
-            print("idx: ", idx)
-                
-            log_info += "initial ob: " + str(ob) + "\n"
-            # print("initial obs: ", ob)
-            
-            # init vars
-            obs, acs, rewards, next_obs, terminals, image_obs_front, image_obs_left, embedding_input, index_input = [], [], [], [], [], [], [], [], []
-            steps = 0
-            done = False
-            
-            while True:
-                
-                ob = ob[:policy.input_shape]
-                obs.append(ob)
-                
-                if use_index:
-                    # print(torch.LongTensor([idx]).reshape(-1, 1))
-                    act = policy.get_action(torch.Tensor(ob).to(self.device).unsqueeze(0), torch.LongTensor([idx]).reshape(-1, 1))
-                else:
-                    act = policy.get_action(torch.Tensor(ob).to(self.device).unsqueeze(0)).detach().cpu().numpy()
-                    
-                act = np.squeeze(act)
-                # log_info += "agent:" + str(act) + "\n"
-                    
-                acs.append(act)
-                # print(act)
-                # print("obs: ", ob)
-                               
-                
-                # take that action and record results
-                ob, r, done, info = env.step(act)
-                ob = ob[:policy.input_shape]
-                
-                # record result of taking that action
-                steps += 1
-                next_obs.append(ob)
-                rewards.append(r)
-                
-                # only support rbg_array mode currently
-                if render:
-                    image = env.get_image(400,400,'leftview')
-                    image_obs_left.append(image)
-                    image = env.get_image(400,400,'frontview')
-                    image_obs_front.append(image)
-                
-                success_1 = max(success_1, info["success_push_1"])
-                success_2 = max(success_2, info["success_push_2"])
-                dist_1 = min(dist_1, info["pushDist1"])
-                dist_2 = min(dist_2, info["pushDist2"])
+        if len(self.task_types) == 1:
+            task_num = 1
+        else:
+            task_num = len(self.task_types)+1
 
-                # end the rollout if the rollout ended
-                rollout_done = True if (done or steps>=self.max_path_length) else False
-                terminals.append(rollout_done)
+        total_cnt = 0
+        for idx in range(task_num):
+            for _ in range(self.eval_episode):
+                success_1, success_2 = 0, 0
+                dist_1, dist_2 = 1, 1
+                
+                env = self.env_info.env
+                env.eval()
+                env.seed(0)
+                ob = env.reset(seed=total_cnt)
+                print("idx: ", idx)
+                    
+                log_info += "initial ob: " + str(ob) + "\n"
+                push_1 = np.linalg.norm(ob[3:6]-ob[9:12])
+                push_2 = np.linalg.norm(ob[6:9]-ob[12:15])
+                
+                print(push_1, push_2)
+                
+                # init vars
+                obs, acs, rewards, next_obs, terminals, image_obs_front, image_obs_left = [], [], [], [], [], [], []
+                steps = 0
+                done = False
+                
+                while True:
+                    
+                    ob = ob[:policy.input_shape]
+                    obs.append(ob)
+                    
+                    if use_index:
+                        # print(torch.LongTensor([idx]).reshape(-1, 1))
+                        act = policy.get_action(torch.Tensor(ob).to(self.device).unsqueeze(0), torch.LongTensor([idx]).reshape(-1, 1))
+                    else:
+                        act = policy.get_action(torch.Tensor(ob).to(self.device).unsqueeze(0)).detach().cpu().numpy()
+                        
+                    act = np.squeeze(act)
+                    # log_info += "agent:" + str(act) + "\n"
+                    acs.append(act)
+                                
+                    
+                    # take that action and record results
+                    ob, r, done, info = env.step(act)
+                    ob = ob[:policy.input_shape]
+                    
+                    # record result of taking that action
+                    steps += 1
+                    next_obs.append(ob)
+                    rewards.append(r)
+                    
+                    # only support rbg_array mode currently
+                    if render:
+                        image = env.get_image(400,400,'leftview')
+                        image_obs_left.append(image)
+                        image = env.get_image(400,400,'frontview')
+                        image_obs_front.append(image)
+                    
+                    success_1 = max(success_1, info["success_push_1"])
+                    success_2 = max(success_2, info["success_push_2"])
+                    dist_1 = min(dist_1, info["pushDist1"])
+                    dist_2 = min(dist_2, info["pushDist2"])
 
-                if rollout_done:
-                    break
-            
-            if len(image_obs_front)>0:
-                imageio.mimsave(log_prefix + str(n_iter) + "_" + str(idx)+ "_agent_front.gif", image_obs_front)
-            if len(image_obs_left)>0:
-                imageio.mimsave(log_prefix + str(n_iter) + "_" + str(idx) +"_agent_left.gif", image_obs_left)
+                    # end the rollout if the rollout ended
+                    rollout_done = True if (done or steps>=self.max_path_length) else False
+                    terminals.append(rollout_done)
+
+                    if rollout_done:
+                        break
+                
+                if len(image_obs_front)>0:
+                    imageio.mimsave(log_prefix + str(n_iter) + "_" + str(idx)+ "_agent_front.gif", image_obs_front)
+                if len(image_obs_left)>0:
+                    imageio.mimsave(log_prefix + str(n_iter) + "_" + str(idx) +"_agent_left.gif", image_obs_left)
+
+                success_push_1 = max(success_push_1, success_1)
+                success_push_2 = max(success_push_2, success_2)
+                
+                # must do the job sequentially
+                if (success_2 == 1 and success_1 == 0 and abs(dist_1-push_1)<0.01):
+                    success_flag_2 = True
+                elif(success_2 == 0 and success_1 == 1 and abs(dist_2-push_2)<0.01):
+                    success_flag_1 = True
+                    
+                log_info += "agent_success_push_1: " + str(success_1) + "\n"
+                log_info += "agent_success_push_2: " + str(success_2) + "\n"
+                log_info += "agent_push_1: " +  str(dist_1) + "\n"
+                log_info += "agent_push_2: " + str(dist_2) + "\n"
+                log_info += "path_length: " + str(len(acs)) + "\n"  
+                log_info += "success: " + str(success_flag_1 and success_flag_2) + "\n"
+                
+                total_cnt += 1
                 
             idx += 1
-
-            success_push_1 = max(success_push_1, success_1)
-            success_push_2 = max(success_push_2, success_2)
             
-            # must do the job sequentially
-            if (success_2 == 1 and success_1 == 0 and abs(dist_1-push_1)<0.01):
-                success_flag_2 = True
-            elif(success_2 == 0 and success_1 == 1 and abs(dist_2-push_2)<0.01):
-                success_flag_1 = True
-                
-            log_info += "agent_success_push_1: " + str(success_1) + "\n"
-            log_info += "agent_success_push_2: " + str(success_2) + "\n"
-            log_info += "agent_push_1: " +  str(dist_1) + "\n"
-            log_info += "agent_push_2: " + str(dist_2) + "\n"
-            log_info += "path_length: " + str(len(acs)) + "\n"  
-            log_info += "success: " + str(success_flag_1 and success_flag_2) + "\n"
-        
+            
         if log == True:
             print(log_info)
         
@@ -408,7 +462,7 @@ class ConcurrentCollector():
         return success_dict
     
     
-    def keyboar2action(self, stdscr):
+    def keyboar2action(self, stdscr, init=False, init_obs=None):
         # collect 4 action dimensions
         import curses
         # TODO: add more levels that can cover all actions ranging from (-1,1)
@@ -418,9 +472,20 @@ class ConcurrentCollector():
         large_step = 0.8
         cnt = 0
         
+        
+        
         while cnt < 4:
             noise = np.random.randn()/10
             keycode = stdscr.getch()
+            
+            if init and cnt==0:
+                print("init trial!")
+                print(init_obs[3:6])
+                print(init_obs[6:9])
+                print(init_obs[9:12])
+                print(init_obs[12:15])
+            
+                return
             
             # small steps
             if keycode == ord("3"):
@@ -511,23 +576,28 @@ class ConcurrentCollector():
                 continue
             
             cnt += 1
-        # print(act)
+            
+        
         return np.array(act)
         
         
-    def start_human_demo(self, stdscr, env, prefix):
+    def start_human_demo(self, stdscr, env, prefix, init_obs):
         
         interface_acs = []
+        interface_obs = []
         image_obs_left = []
         image_obs_front = []
         
         sub_traj = []
+        sub_obs = []
         
         success_push_1 = 0
         success_push_2 = 0
         push_dist1 = 1
         push_dist2 = 1
         steps = 0
+        
+        self.keyboar2action(stdscr, init=True, init_obs=init_obs)
         
         while True:
             act = self.keyboar2action(stdscr)
@@ -536,11 +606,13 @@ class ConcurrentCollector():
                 
             elif (act == np.array([-1,-1,-1,-1])).all():
                 interface_acs.append(sub_traj)
+                interface_obs.append(sub_obs)
                 
                 # save observation and action file
                 for i in range(len(interface_acs)):
                     demonstration = {}
                     demonstration["actions"] = interface_acs[i]
+                    demonstration["observations"] = interface_obs[i]
                     demo_json = json.dumps(demonstration, sort_keys=False, indent=4)
                     f = open(prefix + "expert_demo_" + str(i+1) + ".json", 'w')
                     f.write(demo_json)
@@ -559,18 +631,23 @@ class ConcurrentCollector():
             elif (act == np.array([1,1,1,1])).all():
                 # mark trajectory phase
                 interface_acs.append(sub_traj)
+                interface_obs.append(sub_obs)
                 sub_traj = []
+                sub_obs = []
                 continue
             
             # take that action and record results
             ob, r, done, info = env.step(act)
             # print(ob)
             # ob = np.concatenate((ob[:6], ob[9:12]))
-            ob = ob[:3]
+            
             sub_traj.append(act.tolist())
+            sub_obs.append(ob.tolist())
+            # print(ob)
             
             # record result of taking that action
             steps += 1
+            ob = ob[:3]
             print(ob)
             
             # only support rbg_array mode currently
@@ -612,15 +689,16 @@ class ConcurrentCollector():
         env.eval()
         env.seed(0)
         ob = env.reset()
+        init_obs = ob
+    
         # ob = np.concatenate((ob[:6], ob[9:12]))
-        ob = np.concatenate((ob[:6], ob[9:12]))
         
         
         if len(action_file) == 0:
             print("collecting interface!")
             reset = True
             while reset:
-                reset = self.start_human_demo(stdscr, env, prefix)
+                reset = self.start_human_demo(stdscr, env, prefix, init_obs)
         
         # init vars
         obs, acs, rewards, next_obs, terminals, image_obs_front, image_obs_left, embedding_input, index_input = [], [], [], [], [], [], [], [], []
@@ -651,7 +729,7 @@ class ConcurrentCollector():
             initial_ob = ob
             best_distance = 1
             best_position = None
-            print(initial_ob)
+            
             # offset = np.concatenate([initial_ob[:3], np.array([0])]) - np.array([-0.0326475,   0.51488176,  0.23687746, 0])
             # print("offset: ", offset)
             with open(file, 'r') as fin:
@@ -677,7 +755,7 @@ class ConcurrentCollector():
                 # take that action and record results
                 ob, r, done, info = env.step(act)
                 # print(ob)
-                ob = np.concatenate((ob[:6], ob[9:12]))
+                # ob = np.concatenate((ob[:6], ob[9:12]))
                 
                 # record result of taking that action
                 steps += 1

@@ -7,7 +7,7 @@ python starter/collect_concurrent.py \
     --train_batch_size 32 \
     --config config/concurrent.json \
     --id MT50_Single_Task \
-    --seed 32 \
+    --seed 16 \
     --worker_nums 1 \
     --eval_worker_nums 1 \
     --task_env MT50_task_env \
@@ -15,4 +15,4 @@ python starter/collect_concurrent.py \
     --expert_num 3 \
     --no_cuda \
     --interface true \
-    --interface_num 5
+    --interface_num 16

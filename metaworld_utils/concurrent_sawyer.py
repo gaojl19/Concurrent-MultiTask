@@ -1,6 +1,7 @@
 from collections import OrderedDict
 import numpy as np
 from gym.spaces import  Dict , Box
+import time
 
 
 from metaworld.envs.env_util import get_stat_in_paths, \
@@ -12,11 +13,12 @@ from metaworld.envs.mujoco.sawyer_xyz.base import SawyerXYZEnv
 from metaworld.envs.mujoco.utils.rotation import euler2quat
 from metaworld.envs.mujoco.sawyer_xyz.base import OBS_TYPE
 
+BAR = 0.025
 
 class ConcurrentSawyerEnv(SawyerXYZEnv):
     def __init__(
             self,
-            random_init=False,
+            random_init=True,
             task_types=["push-1", "push-2"],
             obs_type='plain',
             goal_low=(-0.1, 0.6, 0.05),
@@ -57,7 +59,7 @@ class ConcurrentSawyerEnv(SawyerXYZEnv):
         # push-1
         self.init_config1 = {
             'obj_init_angle': .3,
-            'obj_init_pos': np.array([0, 0.65, 0.02]),
+            'obj_init_pos': np.array([0, 0.6, 0.02]),
         }
         
         # push-2
@@ -67,7 +69,8 @@ class ConcurrentSawyerEnv(SawyerXYZEnv):
         }
         
     
-        self.goal = np.array([0.1, 0.8, 0.02, 0.2, 0.6, 0.02])
+        self.goal = np.array([0.05, 0.75, 0.02, 0.2, 0.55, 0.02])
+            
         
         self.obj_init_angle1 = self.init_config1['obj_init_angle']
         self.obj_init_pos1 = self.init_config1['obj_init_pos']
@@ -91,6 +94,8 @@ class ConcurrentSawyerEnv(SawyerXYZEnv):
         self.rotMode = rotMode
         self.sampleMode = sampleMode
         self.task_types = task_types
+        
+        self.random_init = random_init
         
         # separate observations
         # TODO
@@ -135,7 +140,7 @@ class ConcurrentSawyerEnv(SawyerXYZEnv):
             raise NotImplementedError('If you want to use an observation\
                 with_obs_idx, please discretize the goal space after instantiate an environment.')
         self.num_resets = 0
-        self.reset()
+        self.reset(seed=0)
 
     def get_goal(self):
         return {
@@ -286,14 +291,14 @@ class ConcurrentSawyerEnv(SawyerXYZEnv):
         #The convention we follow is that body_com[2] is always 0, and geom_pos[2] is the object height
         return [adjustedPos[0], adjustedPos[1],self.data.get_geom_xpos(obj_geom_name)[-1]]
     
-    def reset(self, push_2_init=False):
+    def reset(self, seed, push_2_init=False):
         self.sim.reset()
-        ob = self.reset_model(push_2_init)
+        ob = self.reset_model(seed=seed, push_2_init=push_2_init)
         if self.viewer is not None:
             self.viewer_setup()
         return ob
 
-    def reset_model(self, push_2_init=False):
+    def reset_model(self, seed=0, push_2_init=False):
         self._reset_hand()
         self._state_goal = self.goal.copy()
         self.obj_init_pos1 = self.adjust_initObjPos(self.init_config1['obj_init_pos'], 'obj1', 'objGeom1')
@@ -305,27 +310,46 @@ class ConcurrentSawyerEnv(SawyerXYZEnv):
         
         self.heightTarget1 = self.objHeight1 + self.liftThresh
         self.heightTarget2 = self.objHeight2 + self.liftThresh
-        
+
+        np.random.seed(seed)
+        if self.random_init:
+            epsilon = np.random.uniform(
+                low=np.array([-BAR, -BAR, 0]),
+                high=np.array([BAR, BAR, 0]),
+                size=np.array([0, 0, 0]).size)
+            self.init_config1["obj_init_pos"] += epsilon
+            epsilon = np.random.uniform(
+                low=np.array([-BAR, -BAR, 0]),
+                high=np.array([BAR, BAR, 0]),
+                size=np.array([0, 0, 0]).size)
+            self.init_config2["obj_init_pos"] += epsilon
+            epsilon = np.random.uniform(
+                low=np.array([-BAR, -BAR, 0, -BAR, -BAR, 0]),
+                high=np.array([BAR, BAR, 0, BAR, BAR, 0]),
+                size=np.array([0, 0, 0, 0, 0, 0]).size)
+            self.goal += epsilon
+            
+            
         # if self.random_init:
-        #     goal_pos = np.random.uniform(
-        #         self.obj_and_goal_space.low,
-        #         self.obj_and_goal_space.high,
-        #         size=(self.obj_and_goal_space.low.size),
-        #     )
-        #     self._state_goal = goal_pos[3:]
-        #     while np.linalg.norm(goal_pos[:2] - self._state_goal[:2]) < 0.15:
-        #         goal_pos = np.random.uniform(
-        #             self.obj_and_goal_space.low,
-        #             self.obj_and_goal_space.high,
-        #             size=(self.obj_and_goal_space.low.size),
-        #         )
-        #         self._state_goal = goal_pos[3:]
-        #     if self.task_type == 'push':
-        #         self._state_goal = np.concatenate((goal_pos[-3:-1], [self.obj_init_pos[-1]]))
-        #         self.obj_init_pos = np.concatenate((goal_pos[:2], [self.obj_init_pos[-1]]))
-        #     else:
-        #         self._state_goal = goal_pos[-3:]
-        #         self.obj_init_pos = goal_pos[:3]
+            # goal_pos = np.random.uniform(
+            #     self.obj_and_goal_space.low,
+            #     self.obj_and_goal_space.high,
+            #     size=(self.obj_and_goal_space.low.size),
+            # )
+            # self._state_goal = goal_pos[3:]
+            # while np.linalg.norm(goal_pos[:2] - self._state_goal[:2]) < 0.15:
+            #     goal_pos = np.random.uniform(
+            #         self.obj_and_goal_space.low,
+            #         self.obj_and_goal_space.high,
+            #         size=(self.obj_and_goal_space.low.size),
+            #     )
+            #     self._state_goal = goal_pos[3:]
+            # if self.task_type == 'push':
+            #     self._state_goal = np.concatenate((goal_pos[-3:-1], [self.obj_init_pos[-1]]))
+            #     self.obj_init_pos = np.concatenate((goal_pos[:2], [self.obj_init_pos[-1]]))
+            # else:
+            #     self._state_goal = goal_pos[-3:]
+            #     self.obj_init_pos = goal_pos[:3]
         
         self._set_goal_marker(self._state_goal)
         self._set_obj_xyz(self.obj_init_pos1)

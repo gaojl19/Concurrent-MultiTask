@@ -1,3 +1,4 @@
+from cgi import test
 import os
 import time
 import torch
@@ -98,8 +99,7 @@ class BC_Trainer(object):
                                      expert_num = args["expert_num"],
                                      plot_prefix=log_prefix,
                                      task_types=[args["task_types"]],
-                                     mt_flag=False,
-                                     idx_flag=True) 
+                                     test_idx_flag=True) 
         
     
     def run_training_loop(self, stdscr=None, interface=False):
@@ -131,6 +131,8 @@ def main():
     parser.add_argument("--test", type=bool, default=False)
     parser.add_argument("--load_from_checkpoint", type=str, default=None)
     parser.add_argument("--interface", type=bool, default=False)
+    parser.add_argument("--train_full_data", type=bool, default=False)
+    
     
     # training settings
     parser.add_argument('--ep_len', type=int)
