@@ -113,21 +113,23 @@ class VAEMultiHeadPolicy(nn.Module):
             # print weights differences
             if log:
                 if self.last_weights.shape == weights.shape:
-                    print("weights difference with last: ", abs(self.last_weights-weights).sum(dim=1), abs(self.last_weights-weights).sum(dim=1).sum(dim=0))
+                    print("weights difference with last: ", abs(self.last_weights-weights).sum(dim=1).sum(dim=0))
                 weight_idx = weights.argmax(dim=1)
                 idx = idx.reshape(weight_idx.shape)
 
-                print("weights differences with truth: ", abs(weight_idx-idx), abs(weight_idx-idx).sum(dim=0))
-            self.last_weights = weights
+                print("weights differences with truth: ", abs(weight_idx-idx).sum(dim=0))
+                self.last_weights = weights
         
         
-        ## Hard update
+        ## Hard update: to be designed
         else:
             weights = self.encoder(obs,acs)
-            # print(weights)
-            print(weights.shape)
+            idx = torch.uniform(0,1)
+            print(idx)
             idx = torch.multinomial(weights, 1)
-            print(idx.shape)
+            print(weights)
+            exit(0)
+            # print(idx.shape)
             # idx = weights.argmax(dim=1, keepdim=True)
             if log:
                 print(idx.reshape(1,-1))

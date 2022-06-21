@@ -36,9 +36,11 @@ class EMMultiHeadPolicy(nn.Module):
         mean_list, std_list, log_std_list = self.policy.train_forward(obs)
         prob = []
         if log:
-            print("mean:", mean_list)
-            print("std: ", std_list)
+            pass
+            # print("mean:", mean_list)
+            # print("std: ", std_list)
             # print("actions: ", acs)
+        
         
         if use_log_prob:
             for i in range(len(mean_list)):
@@ -70,19 +72,13 @@ class EMMultiHeadPolicy(nn.Module):
                 
             weights = torch.stack(weights).detach()
             weights = weights/weights.sum(dim=0)
+            weight_idx = weights.argmax(dim=0)
             if log:
-                print("weights: ", weights.argmax(dim=0))
-                # print("log prob: ", log_prob)
-            
-            # print("weights: ", weights.shape)
-            # print("log prob:", log_prob.shape)
+                print("weights: ", weight_idx)
             
             loss = (log_prob * weights).mean()
             loss = 1/torch.exp(loss)
-            # print(loss)
             
-            
-
         else:
             for i in range(len(mean_list)):
                 mean = mean_list[i]
@@ -100,7 +96,6 @@ class EMMultiHeadPolicy(nn.Module):
                 # print(torch.exp(log_prob))
                 
                 prob.append(log_prob)
-
             prob = torch.stack(prob).detach()
             
             # 2. normalize and calculate weighted loss
@@ -137,16 +132,16 @@ class EMMultiHeadPolicy(nn.Module):
             # print weights differences
             if log:
                 if self.last_weights.shape == weights.shape:
-                    print("weights difference with last: ", abs(self.last_weights-weights).sum(dim=0), abs(self.last_weights-weights).sum(dim=0).sum(dim=0))
+                    print("weights difference with last: ", abs(self.last_weights-weights).sum(dim=0).sum(dim=0))
                 weight_idx = weights.argmax(dim=0)
                 idx = idx.reshape(weight_idx.shape)
-                # print(weight_idx)
-                # print(idx)
-                print("weights differences with truth: ", abs(weight_idx-idx), abs(weight_idx-idx).sum(dim=0))
-                # exit(0)
-            self.last_weights = weights
-            
-        return loss
+                print("weights differences with truth: ", abs(weight_idx-idx).sum(dim=0))
+                
+                self.last_weights = weights
+
+        if log:
+            return loss, weight_idx
+        return loss, None
 
     
     def eval_act(self, obs: np.ndarray, idx):

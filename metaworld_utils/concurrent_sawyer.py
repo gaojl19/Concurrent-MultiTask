@@ -18,7 +18,7 @@ BAR = 0.025
 class ConcurrentSawyerEnv(SawyerXYZEnv):
     def __init__(
             self,
-            random_init=True,
+            random_init=False,
             task_types=["push-1", "push-2"],
             obs_type='plain',
             goal_low=(-0.1, 0.6, 0.05),
@@ -87,7 +87,6 @@ class ConcurrentSawyerEnv(SawyerXYZEnv):
         if goal_high is None:
             goal_high = self.hand_high
 
-        # self.random_init = random_init
         self.liftThresh = liftThresh
         self.max_path_length = 1000
         self.rewMode = rewMode
@@ -96,6 +95,7 @@ class ConcurrentSawyerEnv(SawyerXYZEnv):
         self.task_types = task_types
         
         self.random_init = random_init
+        print("random_init: ", self.random_init)
         
         # separate observations
         # TODO
@@ -361,6 +361,7 @@ class ConcurrentSawyerEnv(SawyerXYZEnv):
         # self.maxPickDist = np.linalg.norm(self.init_fingerCOM - np.array(self.obj_init_pos))
         self.maxPushDist1 = np.linalg.norm(self.obj_init_pos1[:2] - np.array(self._state_goal)[:2])
         self.maxPushDist2 = np.linalg.norm(self.obj_init_pos2[:2] - np.array(self._state_goal)[3:5])
+        # print(self.maxPushDist1, self.maxPushDist2)
         # self.maxPlacingDist = np.linalg.norm(np.array([self.obj_init_pos[0], self.obj_init_pos[1], self.heightTarget]) - np.array(self._state_goal)) + self.heightTarget
         # self.target_rewards = [1000*self.maxPushDist + 1000*2]
         # if self.task_type == 'reach':

@@ -128,6 +128,7 @@ def main():
     parser = argparse.ArgumentParser()
     
     # customized parameters
+    parser.add_argument("--task_types", type=str, default="push",help="task name for single task training: push-1, push-2",)
     parser.add_argument("--task_env", type=str, default=None, help="task to env mapping for single task training: MT10_task_env / MT50_task_env",)
     parser.add_argument("--expert_num", type=int, default=None, help="expert file prefix index", )
     parser.add_argument("--test", type=bool, default=False)

@@ -3,6 +3,8 @@ import torch
 import time
 import copy
 import imageio
+from sklearn.manifold import TSNE
+import seaborn as sns
 
 
 def Path(obs, acs, next_obs, terminals, success, embedding_input = [], index_input = []):
@@ -50,6 +52,22 @@ def get_pathlength(path):
     return len(path["obs"])
 
 
+
+def plot_TSNE(X, Y, plot_prefix, num_color):
+    '''
+        plot t-sne of modular weights
+    '''
+    palette = sns.color_palette("bright", num_color)
+    
+    print(X.shape, Y.shape)
+    
+    # using scikit-learn package
+    tsne = TSNE()
+    X_embedded = tsne.fit_transform(X)  
+    sns_plot = sns.scatterplot(X_embedded[:,0], X_embedded[:,1], hue=Y, legend='full', palette=palette)
+    fig = sns_plot.get_figure()
+    fig.savefig(plot_prefix + "_tsne.png")
+    
 
 def savitzky_golay(y, window_size, order, deriv=0, rate=1):
     '''

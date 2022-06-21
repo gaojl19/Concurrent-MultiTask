@@ -16,7 +16,7 @@ from metaworld_utils.meta_env import generate_single_mt_env
 
 
 class ConcurrentCollector():
-    def __init__(self, env, env_cls, env_args, env_info, device, max_path_length, min_timesteps_per_batch, input_shape, task_types, seed=0, embedding_input = [], index_input = None, eval_episode=3):
+    def __init__(self, env, env_cls, env_args, env_info, device, max_path_length, min_timesteps_per_batch, input_shape, task_types, seed=0, embedding_input = [], index_input = None, eval_episode=1):
         self.env = copy.deepcopy(env)
         self.env_cls = copy.deepcopy(env_cls)
         self.env_args = copy.deepcopy(env_args)
@@ -30,6 +30,8 @@ class ConcurrentCollector():
         self.task_types = task_types
         self.seed = seed
         self.eval_episode = eval_episode
+        self.min_push1 = 1
+        self.min_push2 = 1
         
         self.env_info.env_cls = generate_single_mt_env
         tasks = list(self.env_cls.keys())
@@ -105,6 +107,7 @@ class ConcurrentCollector():
             timesteps_this_batch += len(p["observation"])
 
         return paths, timesteps_this_batch
+    
     
     # the policy gradient should be frozen before sending into this function
     def sample_expert(self, action_file, render=True, log=True, plot_prefix=None, tag=None):  
@@ -203,10 +206,6 @@ class ConcurrentCollector():
 
             print("last observation: ", obs[-1])
         
-        # print(x)
-        # print(y)
-        # print(z)
-        
         success = {
             "push_1": success_push_1,
             "push_2": success_push_2
@@ -243,8 +242,6 @@ class ConcurrentCollector():
         # initialize env for the beginning of a new rollout
         success_push_1 = 0
         success_push_2 = 0
-        push_1 = 0.22360679774997905
-        push_2 = 0.31622776601683794
 
         success_flag_1 = False
         success_flag_2 = False
@@ -339,17 +336,18 @@ class ConcurrentCollector():
         }
         return success_dict
       
-      
-        
+         
     def run_agent(self, policy, render=False, log = False, log_prefix = "./", n_iter=0, use_index=False):
         
         policy.eval()
+        
         # initialize env for the beginning of a new rollout
         success_push_1, success_push_2 = 0, 0
-
         success_flag_1, success_flag_2 = False, False
-        
+        shortest_dist_flag1, shortest_dist_flag2 = False, False
         log_info = ""
+        total_cnt = 0
+        
         
         # test push-1 and push-2 sequentially
         # if only push-1/push-2, test 1
@@ -358,7 +356,7 @@ class ConcurrentCollector():
         else:
             task_num = len(self.task_types)+1
 
-        total_cnt = 0
+        
         for idx in range(task_num):
             for _ in range(self.eval_episode):
                 success_1, success_2 = 0, 0
@@ -374,7 +372,7 @@ class ConcurrentCollector():
                 push_1 = np.linalg.norm(ob[3:6]-ob[9:12])
                 push_2 = np.linalg.norm(ob[6:9]-ob[12:15])
                 
-                print(push_1, push_2)
+                print("original push 1: ", push_1, "original push 2: ", push_2)
                 
                 # init vars
                 obs, acs, rewards, next_obs, terminals, image_obs_front, image_obs_left = [], [], [], [], [], [], []
@@ -434,9 +432,9 @@ class ConcurrentCollector():
                 success_push_2 = max(success_push_2, success_2)
                 
                 # must do the job sequentially
-                if (success_2 == 1 and success_1 == 0 and abs(dist_1-push_1)<0.01):
+                if (success_2 == 1 and success_1 == 0 and abs(dist_1-push_1)<0.001):
                     success_flag_2 = True
-                elif(success_2 == 0 and success_1 == 1 and abs(dist_2-push_2)<0.01):
+                elif(success_2 == 0 and success_1 == 1 and abs(dist_2-push_2)<0.001):
                     success_flag_1 = True
                     
                 log_info += "agent_success_push_1: " + str(success_1) + "\n"
@@ -448,16 +446,26 @@ class ConcurrentCollector():
                 
                 total_cnt += 1
                 
+                if abs(dist_1-push_1)<0.001 and dist_2 < self.min_push2:
+                    self.min_push2 = dist_2
+                    shortest_dist_flag2 = True
+                
+                if abs(dist_2-push_2)<0.001 and dist_1 < self.min_push1:
+                    self.min_push1 = dist_1
+                    shortest_dist_flag1 = True
+                    
             idx += 1
-            
             
         if log == True:
             print(log_info)
         
+        
         success_dict={
             "push_1": success_push_1,
             "push_2": success_push_2,
-            "success": success_flag_1 and success_flag_2
+            "success": success_flag_1 and success_flag_2,
+            "min_dist1": shortest_dist_flag1,
+            "min_dist2": shortest_dist_flag2
         }
         return success_dict
     
@@ -688,7 +696,7 @@ class ConcurrentCollector():
         env = self.env_info.env
         env.eval()
         env.seed(0)
-        ob = env.reset()
+        ob = env.reset(seed=0)
         init_obs = ob
     
         # ob = np.concatenate((ob[:6], ob[9:12]))

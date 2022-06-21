@@ -15,4 +15,4 @@ python starter/collect_concurrent.py \
     --expert_num 3 \
     --no_cuda \
     --interface true \
-    --interface_num 16
+    --interface_num 25

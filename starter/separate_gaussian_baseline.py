@@ -33,7 +33,7 @@ class BC_Trainer(object):
         # BUILD ENV
         self.device = torch.device("cuda:{}".format(args["device"]) if args["cuda"] else "cpu")
         cls_dicts = {"push": ConcurrentSawyerEnv}
-        cls_args = {"push": dict(args=[], kwargs={'obs_type': params['meta_env']['obs_type'], 'task_types': [args["task_types"]]})}
+        cls_args = {"push": dict(args=[], kwargs={'obs_type': params['meta_env']['obs_type'], 'task_types': [args["task_types"]], 'random_init': params['meta_env']['random_init']})}
         env_name =  ConcurrentSawyerEnv
         self.env = get_meta_env(env_name, params['env'], params['meta_env'], return_dicts=False) 
 

@@ -237,7 +237,7 @@ class EMMultiHeadAgent(BaseAgent):
         self.actor.policy.train()
         
         self.optimizer.zero_grad()
-        loss= self.actor.train_forward(ob_no, ac_na, idx, self.loss, log, use_log_prob=self.use_log_prob)
+        loss, weight_idx= self.actor.train_forward(ob_no, ac_na, idx, self.loss, log, use_log_prob=self.use_log_prob)
 
         loss.backward()
         
@@ -246,10 +246,17 @@ class EMMultiHeadAgent(BaseAgent):
         
         self.optimizer.step()
         
-        log = {
-            # You can add extra logging information here, but keep this line
-            'Training Loss': loss.to('cpu').detach().numpy(),
-        } 
+        if log:
+            log = {
+                # You can add extra logging information here, but keep this line
+                'Training Loss': loss.to('cpu').detach().numpy(),
+                'weight_idx': weight_idx.to('cpu').detach().numpy()
+            }
+        else:
+            log = {
+                # You can add extra logging information here, but keep this line
+                'Training Loss': loss.to('cpu').detach().numpy()
+            }  
         return log
     
     def add_to_replay_buffer(self, paths):
